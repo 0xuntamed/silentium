@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { LazyMotion, domAnimation } from 'motion/react'
 import { ScrollTrigger } from './lib/gsap'
 import { startSmoothScroll } from './lib/lenis'
@@ -14,10 +14,21 @@ import { Reviews } from './scenes/Reviews/Reviews'
 import { Cta } from './scenes/CTA/Cta'
 import { installTestHooks } from './lib/testHooks'
 
+// The WebGL stage is its own chunk; it downloads while the visitor sits in the silent intro.
+const Stage = lazy(() => import('./gl/Stage'))
+
 export default function App() {
+  const [stageReady, setStageReady] = useState(false)
   const [gate, setGate] = useState(!hasEntered())
 
   useEffect(() => startSmoothScroll(), [])
+
+  useEffect(() => {
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }
+    const go = () => setStageReady(true)
+    if (w.requestIdleCallback) w.requestIdleCallback(go, { timeout: 1500 })
+    else setTimeout(go, 400)
+  }, [])
 
   // Webfonts change text metrics, which moves every pin: re-measure once they land.
   useEffect(() => {
@@ -33,9 +44,14 @@ export default function App() {
       >
         Skip to content
       </a>
+      {stageReady && (
+        <Suspense fallback={null}>
+          <Stage />
+        </Suspense>
+      )}
       {gate && <Silence onDone={() => setGate(false)} />}
       <Nav />
-      <main id="top" inert={gate}>
+      <main id="top" inert={gate} className="relative z-[1]">
         <Hero />
         <ANC />
         <Spatial />

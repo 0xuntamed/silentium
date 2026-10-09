@@ -8,13 +8,15 @@ import { getLenis, scrollToY, unlockScroll } from './lenis'
  */
 export function installTestHooks() {
   if (!(import.meta.env.DEV || import.meta.env.MODE === 'test')) return
-  Object.assign(window, {
-    __sil: {
+  const w = window as unknown as { __sil?: Record<string, unknown> }
+  w.__sil = Object.assign(w.__sil ?? {}, {
+    ...{
       /** Skip the intro gate instantly. */
       enter() {
         markEntered()
         unlockScroll()
-        document.querySelector('[role="dialog"]')?.remove()
+        const gate = document.querySelector<HTMLElement>('[role="dialog"]')
+        if (gate) gate.style.display = 'none' // React still owns the node; just hide it
         document.querySelector('main')?.removeAttribute('inert')
       },
       /** Jump to a local progress (0..1) inside a registered scene. */

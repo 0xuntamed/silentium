@@ -7,6 +7,7 @@ import { mkdirSync, rmSync } from 'node:fs'
 
 const only = process.argv.find((a) => a.startsWith('--only='))?.split('=')[1]
 const reduced = process.argv.includes('--reduced')
+const notesOnly = process.argv.includes('--notes')
 const out = 'shots'
 rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })
@@ -29,7 +30,7 @@ await build({ mode: 'test', logLevel: 'warn', build: { outDir: 'dist-test', empt
 const server = await preview({ mode: 'test', logLevel: 'warn', build: { outDir: 'dist-test' }, preview: { port: 4174, strictPort: true } })
 const url = server.resolvedUrls.local[0]
 
-const browser = await chromium.launch()
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
 const errors = []
 try {
   for (const vp of VIEWPORTS) {
@@ -66,6 +67,44 @@ try {
       continue
     }
 
+    if (notesOnly) {
+      await page.evaluate(() => window.__sil.enter())
+      await page.mouse.move(vp.width * 0.7, vp.height * 0.4)
+      await page.waitForTimeout(2500)
+      for (const p of [0, 0.26, 0.46, 0.66, 0.9]) {
+        await page.evaluate((q) => window.__sil.notes.setProgram(q), p)
+        await page.evaluate(() => window.__sil.notes.fastForward(4))
+        await page.waitForTimeout(400)
+        await page.screenshot({ path: tag('notes-p' + String(Math.round(p * 100)).padStart(3, '0')) })
+      }
+      await page.evaluate(() => window.__sil.notes.setProgram(0.0))
+      await page.waitForTimeout(2500)
+      // Fast scroll: notes should stream and stretch.
+      for (let k = 0; k < 5; k++) {
+        await page.mouse.wheel(0, 300)
+        await page.waitForTimeout(40)
+      }
+      await page.screenshot({ path: tag('notes-streak') })
+      await page.waitForTimeout(3000)
+      await page.screenshot({ path: tag('notes-settled') })
+      // Scroll-driven cues (no debug override): staff at the end of hero, wave at ANC start, outline, cable.
+      await page.evaluate(() => window.__sil.notes.setProgram(null))
+      for (const [id, p] of [['hero', 0.97], ['anc', 0.1], ['materials', 0.08]]) {
+        await page.evaluate(([i, q]) => window.__sil.goto(i, q), [id, p])
+        await page.waitForTimeout(1800) // let the real scroll-velocity signal decay
+        await page.evaluate(() => window.__sil.notes.fastForward(4))
+        await page.waitForTimeout(400)
+        await page.screenshot({ path: tag('notes-scroll-' + id) })
+      }
+      await page.evaluate(() => document.getElementById('cta').scrollIntoView())
+      await page.evaluate(() => window.scrollBy(0, 0))
+      await page.evaluate(() => window.__sil.notes.fastForward(4))
+        await page.waitForTimeout(400)
+      await page.screenshot({ path: tag('notes-scroll-cta') })
+      console.log(vp.name, JSON.stringify(await page.evaluate(() => window.__sil.notes.stats())))
+      await ctx.close()
+      continue
+    }
     for (const [id, points] of Object.entries(PLAN)) {
       if (only && only !== id) continue
       for (const p of points) {

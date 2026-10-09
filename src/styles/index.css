@@ -194,6 +194,29 @@
     animation: none !important;
   }
 }
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  15% {
+    transform: scale(1.14);
+    opacity: 1;
+  }
+  45% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+}
+.breathe {
+  animation: breathe var(--beat) cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .breathe {
+    animation: none !important;
+  }
+}
 .beat {
   animation: beat var(--beat) cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }

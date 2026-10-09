@@ -66,7 +66,7 @@ export function ANC() {
       </div>
 
       {/* dB meter */}
-      <div className="absolute right-[var(--gutter)] top-[7.25rem] z-10 w-[min(15rem,46vw)] md:top-[5.25rem]" aria-hidden>
+      <div className="absolute right-[var(--gutter)] top-[7.25rem] z-10 w-[min(15rem,46vw)] md:top-[5.25rem] motion-reduce:static motion-reduce:mb-10" aria-hidden>
         <div className="flex items-baseline justify-between">
           <span className="label">{anc.meter.label}</span>
           <span className="relative h-4 w-14">
