@@ -9,15 +9,16 @@ const only = process.argv.find((a) => a.startsWith('--only='))?.split('=')[1]
 const reduced = process.argv.includes('--reduced')
 const notesOnly = process.argv.includes('--notes')
 const ancChecks = process.argv.includes('--anc-checks')
+const withSound = process.argv.includes('--sound')
 const out = 'shots'
 rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })
 
 const PLAN = {
-  hero: [0, 0.3, 0.6, 0.95],
+  hero: [0, 0.2, 0.35, 0.55, 0.8, 0.95],
   anc: [0, 0.1, 0.2, 0.3, 0.33, 0.4, 0.5, 0.62, 0.72, 0.9, 1],
-  spatial: [0, 0.4, 0.9],
-  materials: [0.05, 0.5, 0.8],
+  spatial: [0, 0.12, 0.4, 0.7, 0.92],
+  materials: [0.08, 0.2, 0.32, 0.45, 0.6, 0.72, 0.9],
   specs: [0.05, 0.5, 0.85],
   reviews: [0],
   cta: [0],
@@ -51,6 +52,7 @@ try {
     if (!only) {
       await page.waitForTimeout(3800)
       await page.screenshot({ path: tag('00-gate') })
+      if (withSound) await page.click('button[aria-pressed]') // opt in to sound first
       await page.mouse.click(vp.width / 2, vp.height / 2)
       await page.waitForTimeout(700)
       await page.screenshot({ path: tag('01-bloom') })
@@ -132,7 +134,7 @@ try {
           errors.push(`[${vp.name}] scene-${id} not registered`)
           break
         }
-        await page.waitForTimeout(id === "anc" ? 1600 : 450)
+        await page.waitForTimeout(id === "anc" || id === "spatial" || id === "materials" || id === "hero" ? 1800 : 450)
         await page.screenshot({ path: tag(`${id}-${String(Math.round(p * 100)).padStart(3, '0')}`) })
       }
     }

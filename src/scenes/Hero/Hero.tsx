@@ -1,5 +1,9 @@
-import { useRef } from 'react'
-import { gsap, SplitText, useGSAP } from '../../lib/gsap'
+import { useEffect, useRef } from 'react'
+import { gsap, ScrollTrigger, SplitText, useGSAP } from '../../lib/gsap'
+import { ConeLetters } from '../../lib/coneLetters'
+import { scrollSignal } from '../../lib/scroll'
+import { isSoundOn } from '../../lib/audio'
+import { cursorSignal } from '../../systems/cursor/cursorSignal'
 import { useScene } from '../../lib/useScene'
 import { whenEntered } from '../../lib/session'
 import { prefersReducedMotion } from '../../lib/useReducedMotion'
@@ -9,8 +13,8 @@ import { brand, hero } from '../../content/copy'
 const LETTERS = brand.name.split('')
 
 /**
- * Hero "Wake". Phase 1 skeleton: wordmark, tagline and technical callouts with a scrubbed hand-off.
- * (Phase 4 adds cone-vibrating letters, the SILENTIUM One model and the staff gather.)
+ * Hero "Wake": a wordmark whose letters ring like speaker cones, the tagline, technical callouts and a
+ * scrubbed hand-off. SILENTIUM One itself is drawn behind the type by the shared WebGL stage.
  */
 export function Hero() {
   const root = useRef<HTMLElement>(null)
@@ -39,6 +43,94 @@ export function Hero() {
     },
     { scope: root },
   )
+
+  // Hero type made of sound: every letter is a speaker cone. The intro bloom sets them ringing in a
+  // wave out from the dot; after that the cursor, scroll speed and the 1 Hz heartbeat keep exciting them.
+  useEffect(() => {
+    const el = root.current
+    if (!el || prefersReducedMotion()) return
+    const chars = Array.from(el.querySelectorAll<HTMLElement>('[data-char]'))
+    const cone = new ConeLetters(chars.length)
+    const set = chars.map((c) => ({
+      y: gsap.quickSetter(c, 'y', 'px'),
+      sy: gsap.quickSetter(c, 'scaleY'),
+      sk: gsap.quickSetter(c, 'skewX', 'deg'),
+    }))
+    const centres = chars.map(() => ({ x: 0, y: 0 }))
+    const measure = () => {
+      chars.forEach((c, i) => {
+        const r = c.getBoundingClientRect()
+        centres[i].x = r.left + r.width / 2
+        centres[i].y = r.top + r.height / 2
+      })
+    }
+    measure()
+    let frame = 0
+    let lastBeat = -1
+    let t = 0
+    const pending: { at: number; i: number; k: number }[] = []
+
+    const stopEntered = whenEntered(() => {
+      measure()
+      // A shockwave from the dot: letters ring in order of their distance from the centre of the screen.
+      chars.forEach((_, i) => {
+        const d = Math.abs(centres[i].x - window.innerWidth / 2) / window.innerWidth
+        pending.push({ at: t + 0.75 + d * 1.1, i, k: 1.1 })
+      })
+    })
+
+    const hero = () => ScrollTrigger.getById('scene-hero')
+    const tick = (_time: number, dtMs: number) => {
+      const dt = Math.min(dtMs / 1000, 0.05)
+      t += dt
+      if (frame++ % 12 === 0) measure()
+      const p = hero()?.progress ?? 0
+      const live = p < 0.4
+
+      for (let k = pending.length - 1; k >= 0; k--) {
+        if (t >= pending[k].at) {
+          cone.kick(pending[k].i, pending[k].k)
+          pending.splice(k, 1)
+        }
+      }
+      if (live) {
+        // Cursor: moving through a letter plucks it.
+        if (cursorSignal.active && cursorSignal.pointerType !== 'touch' && cursorSignal.speed > 120) {
+          const s = Math.min(1, cursorSignal.speed / 1800)
+          for (let i = 0; i < chars.length; i++) {
+            const d = Math.hypot(cursorSignal.x - centres[i].x, cursorSignal.y - centres[i].y)
+            if (d < 300) cone.kick(i, s * (1 - d / 300) * 0.5 * dt * 60 * (i % 2 ? 1 : -1))
+          }
+        }
+        // Scroll speed shakes the whole word.
+        if (scrollSignal.speed > 0.06) {
+          for (let i = 0; i < chars.length; i++) cone.kick(i, scrollSignal.speed * 0.45 * dt * 60 * (Math.sin(t * 40 + i * 2.1) > 0 ? 1 : -1))
+        }
+        // The bass: a gentle thump on every beat (stronger when sound is on).
+        const beat = Math.floor(t)
+        if (beat !== lastBeat && t > 3) {
+          lastBeat = beat
+          for (let i = 0; i < chars.length; i++) cone.kick(i, isSoundOn() ? 0.26 : 0.09)
+        }
+      }
+
+      cone.step(dt)
+      for (let i = 0; i < chars.length; i++) {
+        const x = cone.pos[i]
+        set[i].y(x * 15)
+        set[i].sy(1 + x * 0.055)
+        set[i].sk(x * 3.2)
+      }
+    }
+    gsap.ticker.add(tick)
+    window.addEventListener('resize', measure)
+    return () => {
+      stopEntered()
+      gsap.ticker.remove(tick)
+      window.removeEventListener('resize', measure)
+      chars.forEach((c) => gsap.set(c, { y: 0, scaleY: 1, skewX: 0 }))
+    }
+  }, [])
 
   useScene(root, {
     id: 'hero',

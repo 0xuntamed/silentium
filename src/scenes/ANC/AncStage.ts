@@ -7,7 +7,7 @@
  * Everything here is a function of `AncState` (scroll progress) plus the ambient noise clock.
  */
 import * as THREE from 'three'
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { getEnvironment } from '../../gl/env'
 import { PROJECTION_GLSL, makeSeeds, phase, projectedPos, type ProjUniforms, type Seed } from './projection'
 import { ancLayout, type AncLayout, type AncState } from './state'
 import { EAR, EAR_POS, HAIR, SILHOUETTE, samplePolygon } from './profile'
@@ -370,11 +370,7 @@ export class AncStage {
   // ───────────────────────── construction ─────────────────────────
 
   private buildEnvironment(renderer: THREE.WebGLRenderer) {
-    const pm = new THREE.PMREMGenerator(renderer)
-    const room = new RoomEnvironment()
-    this.scene.environment = pm.fromScene(room, 0.04).texture
-    this.disposables.push(pm, this.scene.environment)
-    room.dispose()
+    this.scene.environment = getEnvironment(renderer)
     const key = new THREE.DirectionalLight(0xfff1dc, 1.4)
     key.position.set(-3, 4, 6)
     this.scene.add(key, new THREE.AmbientLight(0xffffff, 0.12))

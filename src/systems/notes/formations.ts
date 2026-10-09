@@ -149,7 +149,8 @@ export class Formations {
   /** Half-length of the staff in world units. */
   readonly staffHalf: number
 
-  constructor(aspect: number, nDash: number) {
+  /** `outlineShift` slides the product outline sideways to sit where the 3D model will appear. */
+  constructor(aspect: number, nDash: number, outlineShift = 0) {
     this.aspect = aspect
     this.nDash = nDash
     this.staffHalf = aspect * 0.88
@@ -171,6 +172,7 @@ export class Formations {
 
     const fit = Math.min(1, aspect / 1.15) // keep the outline inside narrow portrait screens
     this.outline = sampleMany(headphoneOutline(0.95 * Math.max(fit, 0.55)), nDash)
+    for (let i = 0; i < nDash; i++) this.outline.x[i] += outlineShift
     this.cable = sampleMany(earbudCable(aspect), nDash)
 
     // The four-note "Silentium motif" lands on the staff (x spread, y on lines/spaces).

@@ -5,7 +5,10 @@ import { scrollSignal } from '../../lib/scroll'
 import { cursorSignal, tickCursor } from '../cursor/cursorSignal'
 import type { Tier } from '../../lib/tier'
 import { ancLive } from '../../scenes/ANC/live'
+import { bloom } from './bloom'
 import { ancLayout } from '../../scenes/ANC/state'
+import { productLive } from '../../scenes/Materials/live'
+import { spatialLive } from '../../scenes/Spatial/live'
 
 /**
  * The notes engine: owns the sim and runs it once per shared-ticker frame.
@@ -76,6 +79,14 @@ class NotesEngine {
     const sim = this.sim
     if (!sim) return
     dt = Math.min(dt, 1 / 20)
+    if (bloom.pending) {
+      const b = bloom.pending
+      bloom.pending = null
+      if (performance.now() - b.t < 6000) {
+        // The intro's first input: a burst of notes from the dot (high velocity = long streaks).
+        sim.burst((b.x / this.viewportW - 0.5) * 2 * sim.aspect, -(b.y / this.viewportH - 0.5) * 2, 1300, 3.6)
+      }
+    }
     this.t += dt
     tickCursor(dt)
     stepConductor(dt, scrollCues, scrollSignal.y)
@@ -90,6 +101,7 @@ class NotesEngine {
     inp.cursor.y = -(cursorSignal.y / H - 0.5) * 2
     inp.cursor.speed = cursorSignal.speed * (2 / H)
 
+    inp.dim = Math.max(productLive.state.vis, spatialLive.active ? spatialLive.vis * 0.7 : 0)
     const lay = ancLayout(sim.aspect)
     const a = inp.anc!
     a.gather = ancLive.state.gather * ancLive.vis

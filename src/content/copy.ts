@@ -59,6 +59,9 @@ export const spatial = {
   title: ['Sound has a', 'place.'] as const,
   body: 'Head-tracked spatial audio holds every instrument exactly where the mix put it — even when you turn your head.',
   hint: 'Move your cursor. Place the sound.',
+  hintTouch: 'Tap anywhere. Place the sound.',
+  audioOff: 'Turn sound on — best with headphones.',
+  audioOn: 'Sound on — you are hearing it in 3D.',
   readout: [
     { k: 'Azimuth', v: '37°' },
     { k: 'Distance', v: '1.2 m' },
@@ -73,6 +76,12 @@ export const materials = {
   title: ['Twenty-four parts.', 'One intention.'] as const,
   body: 'Machined aluminium yokes. Protein-leather cushions over slow-recovery memory foam. A beryllium-coated driver, tuned by ear.',
   finishes: ['Basalt', 'Bone', 'Brass'],
+  finishNote: 'Choose a finish',
+  materialsList: [
+    { k: 'Frame', v: 'Machined aluminium' },
+    { k: 'Cushion', v: 'Protein leather, memory foam' },
+    { k: 'Driver', v: 'Beryllium-coated, 40 mm' },
+  ],
   parts: [
     'Headband shell', 'Headband pad', 'Spring slider L', 'Spring slider R',
     'Yoke L', 'Yoke R', 'Cup shell L', 'Cup shell R',

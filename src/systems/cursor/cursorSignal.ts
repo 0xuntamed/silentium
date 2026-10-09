@@ -12,6 +12,8 @@ export const cursorSignal = {
   /** True once a mouse/pen has moved over the page and until it leaves. */
   active: false,
   pointerType: 'mouse' as string,
+  /** performance.now() of the last move or tap. */
+  lastAct: 0,
 }
 
 let lastX = 0
@@ -32,6 +34,15 @@ function onMove(e: PointerEvent) {
   cursorSignal.y = e.clientY
   cursorSignal.active = true
   cursorSignal.pointerType = e.pointerType
+  cursorSignal.lastAct = now
+}
+
+/** A tap is steering too (touch screens have no hover). */
+function onDown(e: PointerEvent) {
+  cursorSignal.x = e.clientX
+  cursorSignal.y = e.clientY
+  cursorSignal.pointerType = e.pointerType
+  cursorSignal.lastAct = performance.now()
 }
 
 const onLeave = () => {
@@ -46,10 +57,12 @@ export function tickCursor(dt: number) {
 
 export function startCursorTracking(): () => void {
   window.addEventListener('pointermove', onMove, { passive: true })
+  window.addEventListener('pointerdown', onDown, { passive: true })
   document.documentElement.addEventListener('pointerleave', onLeave)
   window.addEventListener('blur', onLeave)
   return () => {
     window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerdown', onDown)
     document.documentElement.removeEventListener('pointerleave', onLeave)
     window.removeEventListener('blur', onLeave)
   }

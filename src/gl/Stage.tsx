@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { gsap, ScrollTrigger } from '../lib/gsap'
+import { gsap } from '../lib/gsap'
 import { detectTier, type Tier } from '../lib/tier'
 import { engine } from '../systems/notes/engine'
 import { watchScrollCues } from '../systems/notes/scrollCues'
@@ -10,13 +10,14 @@ import { NotesField } from '../systems/notes/NotesField'
 import { NearLayer2D } from '../systems/notes/NearLayer2D'
 import { Cursor } from '../systems/cursor/Cursor'
 import { DebugPanel } from '../systems/notes/DebugPanel'
-import { scrollSignal } from '../lib/scroll'
-import { AncStage } from '../scenes/ANC/AncStage'
 import { ancLive, updateAncLive } from '../scenes/ANC/live'
 import { setAncStills } from '../scenes/ANC/stills'
+import { productLive, setFinishIndex, setProductStills, updateProductLive } from '../scenes/Materials/live'
+import { spatialLive, updateSpatialLive } from '../scenes/Spatial/live'
 import { ShakeAndGrain } from '../systems/grain/ShakeAndGrain'
+import { Passes } from './Passes'
 
-/** Local progress points for the reduced-motion stills: before / ANC on / after. */
+/** Local progress points for the reduced-motion ANC stills: before / ANC on / after. */
 const STILL_POINTS = [0.05, 0.5, 0.8]
 
 /** Fits an orthographic camera to world space (y ∈ [-1, 1], x ∈ [-aspect, aspect]) and drives the loop. */
@@ -25,7 +26,11 @@ function Rig({ tier }: { tier: Tier }) {
   const size = useThree((s) => s.size)
   const advance = useThree((s) => s.advance)
   const gl = useThree((s) => s.gl)
-  const anc = useRef<AncStage | null>(null)
+  const passes = useMemo(
+    () => new Passes(tier, gl, camera, size.width / size.height),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tier, gl, camera],
+  )
 
   // Camera follows the viewport aspect.
   useLayoutEffect(() => {
@@ -41,71 +46,88 @@ function Rig({ tier }: { tier: Tier }) {
     cam.position.set(0, 0, 5)
     cam.updateProjectionMatrix()
     engine.resize(size.width, size.height)
-    anc.current?.resize(gl, aspect)
+    passes.resize(aspect)
     if (tier.name === 'still') advance(performance.now())
-  }, [camera, size, advance, tier, gl])
+  }, [camera, size, advance, tier, passes])
 
-  // The ANC scene is a render pass inside this same canvas. It is built lazily (PMREM + shader
-  // compiles are not free), a couple of viewports before the visitor reaches the scene.
-  const sizeRef = useRef(size)
-  sizeRef.current = size
-  const ensureAnc = () => {
-    if (!anc.current) {
-      const stage = new AncStage(tier, gl, sizeRef.current.width / sizeRef.current.height)
-      anc.current = stage
-      void gl.compileAsync?.(stage.scene, camera)
-    }
-    return anc.current
-  }
-
+  // Dev/test handles: deterministic frames for the Playwright harness.
   useEffect(() => {
     const w = window as unknown as { __sil?: Record<string, unknown> }
+    const snap = () => gl.domElement.toDataURL('image/png')
     w.__sil = Object.assign(w.__sil ?? {}, {
       anc: {
         /** Pin the scene to a progress (or null to follow scroll). */
         setP: (p: number | null) => {
           ancLive.override = p
-          ensureAnc()
+          passes.ensureAnc()
         },
-        parity: (R = 0.45, u = 0.55) => ensureAnc().parity(gl, R, u),
+        parity: (R = 0.45, u = 0.55) => passes.ensureAnc().parity(gl, R, u),
         /** Deterministic frame at progress p (noise clock frozen), as a PNG data URL. */
         snapshot: (p: number) => {
-          const stage = ensureAnc()
+          const stage = passes.ensureAnc()
           ancLive.frozen = true
           ancLive.override = p
           updateAncLive(0, window.innerHeight)
           stage.update(0, ancLive.state, 1, 0)
           advance(performance.now())
-          return gl.domElement.toDataURL('image/png')
+          return snap()
         },
         progress: () => ancLive.p,
       },
+      product: {
+        setP: (scene: 'hero' | 'materials' | null, p = 0) => {
+          productLive.override = scene ? { scene, p } : null
+          passes.ensureProduct()
+        },
+        setFinish: (i: number) => setFinishIndex(i),
+        snapshot: (scene: 'hero' | 'materials', p: number, finish = 0) => {
+          const stage = passes.ensureProduct()
+          ancLive.frozen = true
+          productLive.override = { scene, p }
+          updateProductLive(0)
+          stage.setFinish(finish)
+          stage.update(1, productLive.state, true)
+          advance(performance.now())
+          return snap()
+        },
+      },
+      spatial: {
+        setP: (p: number | null) => {
+          spatialLive.override = p
+          passes.ensureSpatial()
+        },
+        snapshot: (p: number) => {
+          const pass = passes.ensureSpatial()
+          ancLive.frozen = true
+          spatialLive.override = p
+          updateSpatialLive(1 / 60, 6000, 0, passes.aspect, { x: 0, y: 0, lastAct: 0, present: false })
+          pass.update(6)
+          advance(performance.now())
+          return snap()
+        },
+      },
     })
-    return () => {
-      anc.current?.dispose()
-      anc.current = null
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gl, tier])
+    return () => passes.dispose()
+  }, [gl, passes, advance])
 
-  // Render order: ANC composite, then the notes on top. (A positive priority takes over rendering.)
+  // Render order: the scene passes, then the notes on top. (A positive priority takes over rendering.)
   useFrame(({ gl: renderer, scene, camera: cam }) => {
     renderer.autoClear = false
     renderer.setRenderTarget(null)
     renderer.clear()
-    if (anc.current && ancLive.active) anc.current.render(renderer, cam)
+    passes.render(renderer, cam)
     renderer.render(scene, cam)
   }, 1)
 
-  // One shared clock: gsap.ticker advances the scene state, the sim, then the renderer.
+  // One shared clock: gsap.ticker advances the scene states, the sim, then the renderer.
   useEffect(() => {
     gl.setClearColor(0x000000, 0)
     if (tier.name === 'still') {
-      // Reduced motion: no loop. Render three designed ANC stills, then one settled notes frame.
+      // Reduced motion: no loop. Render designed stills once, then one settled notes frame.
       const urls: string[] = []
       engine.prewarm(240)
       const a = engine.inputs.anc!
-      const stage = ensureAnc()
+      const stage = passes.ensureAnc()
       // The stills drive the notes through the bubble; keep the settled field to restore afterwards.
       const sim = engine.sim!
       const keep = { x: sim.x.slice(), y: sim.y.slice(), vx: sim.vx.slice(), vy: sim.vy.slice(), rot: sim.rot.slice() }
@@ -126,6 +148,23 @@ function Rig({ tier }: { tier: Tier }) {
       updateAncLive(0, window.innerHeight)
       a.gather = 0
       a.R = 0
+
+      // The model: exploded, then assembled (shown in the static Materials layout).
+      const product = passes.ensureProduct()
+      const prodUrls: string[] = []
+      const base = { vis: 1, x: 0, y: 0, scale: 0.8, rotX: 0.3, rotY: -0.62 }
+      sim.x.fill(1e4) // notes out of frame for the product stills
+      engine.prewarm(0)
+      for (const explode of [1, 0]) {
+        productLive.state = { ...base, explode } // the render pass is gated on this
+        product.update(1, productLive.state, true)
+        advance(performance.now())
+        prodUrls.push(gl.domElement.toDataURL('image/png'))
+      }
+      productLive.state = { ...base, vis: 0, explode: 0 }
+      product.update(1, productLive.state, true)
+      setProductStills(prodUrls)
+
       sim.x.set(keep.x)
       sim.y.set(keep.y)
       sim.vx.set(keep.vx)
@@ -138,18 +177,13 @@ function Rig({ tier }: { tier: Tier }) {
     const tick = (time: number, deltaMs: number) => {
       if (document.hidden || ancLive.frozen) return
       const dt = deltaMs / 1000
-      updateAncLive(scrollSignal.y, window.innerHeight)
-      if (!anc.current) {
-        const st = ScrollTrigger.getById('scene-anc')
-        if (st && scrollSignal.y > st.start - window.innerHeight * 2.5) ensureAnc()
-      }
+      passes.tick(dt, time)
       engine.frame(dt)
-      if (anc.current && ancLive.active) anc.current.update(Math.min(dt, 0.05), ancLive.state, ancLive.vis, time)
       advance(time * 1000)
     }
     gsap.ticker.add(tick)
     return () => gsap.ticker.remove(tick)
-  }, [advance, gl, tier])
+  }, [advance, gl, tier, passes])
 
   return <NotesField />
 }

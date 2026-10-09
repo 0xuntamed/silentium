@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { gsap, SplitText, useGSAP } from '../../lib/gsap'
 import { lockScroll, unlockScroll } from '../../lib/lenis'
 import { markEntered } from '../../lib/session'
+import { playBloom } from '../../lib/audio'
+import { requestBloom } from '../../systems/notes/bloom'
 import { prefersReducedMotion } from '../../lib/useReducedMotion'
 import { intro } from '../../content/copy'
 import { SoundToggle } from '../../components/SoundToggle'
@@ -46,6 +48,10 @@ export function Silence({ onDone }: { onDone: () => void }) {
   const enter = () => {
     if (started.current) return
     started.current = true
+    // The first input turns the sound on: notes burst from the dot, and (if the visitor opted in) a pad swells.
+    const r = dot.current?.getBoundingClientRect()
+    requestBloom(r ? r.left + r.width / 2 : window.innerWidth / 2, r ? r.top + r.height / 2 : window.innerHeight * 0.4)
+    playBloom()
     const done = () => {
       unlockScroll()
       onDone()

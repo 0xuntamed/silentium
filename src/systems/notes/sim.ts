@@ -9,6 +9,7 @@
  */
 import { clamp, lerp } from '../../lib/math'
 import { Formations } from './formations'
+import { productAnchor } from '../../scenes/Materials/productState'
 import type { Weights } from './conductor'
 
 export const LAYER_FAR = 0
@@ -39,6 +40,8 @@ export interface SimInputs {
   weights: Weights
   /** ANC scene: draw notes into the bubble. gather 0 = off. */
   anc?: { gather: number; cx: number; cy: number; R: number }
+  /** 0..1: how much the 3D model on screen should quieten the notes behind and in front of it. */
+  dim?: number
 }
 
 /** Output buffers, 4/4/2 floats per particle: (x, y, rot, glyph), (sx, sy, alpha, tint), (vx, vy). */
@@ -191,7 +194,7 @@ export class NotesSim {
     this.dashIndex = new Int32Array(n).fill(-1)
     this.motifSlot = new Int8Array(n).fill(-1)
     this.render = { a: new Float32Array(n * 4), b: new Float32Array(n * 4), v: new Float32Array(n * 2) }
-    this.formations = new Formations(cfg.aspect, cfg.dashes)
+    this.formations = new Formations(cfg.aspect, cfg.dashes, productAnchor(cfg.aspect).x)
 
     const rnd = this.rng
     const glyphBag = [0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 4, 5, 6]
@@ -245,13 +248,13 @@ export class NotesSim {
     const f = aspect / this.aspect
     for (let i = 0; i < this.n; i++) this.x[i] *= f
     this.aspect = aspect
-    this.formations = new Formations(aspect, this.cfg.dashes)
+    this.formations = new Formations(aspect, this.cfg.dashes, productAnchor(aspect).x)
   }
 
   /** Throw `count` random notes outward from a point (used by the intro bloom and the debug panel). */
   burst(cx: number, cy: number, count: number, speed: number) {
     const rnd = this.rng
-    const total = this.nearStart
+    const total = this.n
     for (let k = 0; k < count; k++) {
       const i = Math.floor(rnd() * total)
       if (this.kind[i] !== 0 || this.motifSlot[i] >= 0) continue
@@ -460,7 +463,7 @@ export class NotesSim {
         b[o4 + 2] = lerp(0.2, 0.7, Wg)
         b[o4 + 3] = 0.45
       } else {
-        let recede = mSlot >= 0 ? 1 : 1 - 0.8 * Wg
+        let recede = (mSlot >= 0 ? 1 : 1 - 0.8 * Wg) * (1 - 0.55 * (inp.dim ?? 0))
         if (ancOn && mSlot < 0) {
           const ex = this.x[i] - A!.cx
           const ey = this.y[i] - A!.cy
