@@ -8,13 +8,14 @@ import { mkdirSync, rmSync } from 'node:fs'
 const only = process.argv.find((a) => a.startsWith('--only='))?.split('=')[1]
 const reduced = process.argv.includes('--reduced')
 const notesOnly = process.argv.includes('--notes')
+const ancChecks = process.argv.includes('--anc-checks')
 const out = 'shots'
 rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })
 
 const PLAN = {
   hero: [0, 0.3, 0.6, 0.95],
-  anc: [0, 0.2, 0.34, 0.5, 0.7, 0.9, 1],
+  anc: [0, 0.1, 0.2, 0.3, 0.33, 0.4, 0.5, 0.62, 0.72, 0.9, 1],
   spatial: [0, 0.4, 0.9],
   materials: [0.05, 0.5, 0.8],
   specs: [0.05, 0.5, 0.85],
@@ -67,6 +68,24 @@ try {
       continue
     }
 
+    if (ancChecks) {
+      await page.evaluate(() => window.__sil.enter())
+      await page.waitForTimeout(2500)
+      const parity = await page.evaluate(() => [0, 0.2, 0.45, 0.6].map((R) => ({ R, ...window.__sil.anc.parity(R) })))
+      const snap = (p) => page.evaluate((q) => window.__sil.anc.snapshot(q), p)
+      const a = await snap(0.7)
+      await snap(0.3)
+      await snap(0.5)
+      const b = await snap(0.7)
+      const other = await snap(0.3)
+      const worst = Math.max(...parity.map((x) => x.maxError))
+      console.log(vp.name, 'GPU/CPU parity worst error', worst.toExponential(2), '| reverse-scroll frames identical:', a === b, '| different progress differs:', a !== other)
+      if (a !== b) errors.push('[' + vp.name + '] reverse scroll is not exact')
+      if (a === other) errors.push('[' + vp.name + '] snapshots do not change with progress')
+      if (!(worst < 2e-3)) errors.push('[' + vp.name + '] GPU/CPU projection parity error ' + worst)
+      await ctx.close()
+      continue
+    }
     if (notesOnly) {
       await page.evaluate(() => window.__sil.enter())
       await page.mouse.move(vp.width * 0.7, vp.height * 0.4)
@@ -113,7 +132,7 @@ try {
           errors.push(`[${vp.name}] scene-${id} not registered`)
           break
         }
-        await page.waitForTimeout(450)
+        await page.waitForTimeout(id === "anc" ? 1600 : 450)
         await page.screenshot({ path: tag(`${id}-${String(Math.round(p * 100)).padStart(3, '0')}`) })
       }
     }

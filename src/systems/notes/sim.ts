@@ -37,6 +37,8 @@ export interface SimInputs {
   viewportH: number
   cursor: { x: number; y: number; speed: number; active: boolean }
   weights: Weights
+  /** ANC scene: draw notes into the bubble. gather 0 = off. */
+  anc?: { gather: number; cx: number; cy: number; R: number }
 }
 
 /** Output buffers, 4/4/2 floats per particle: (x, y, rot, glyph), (sx, sy, alpha, tint), (vx, vy). */
@@ -279,6 +281,8 @@ export class NotesSim {
     const mv = clamp(cursor.speed / 1.4)
     const relax = 1.3
     const useWave = W.wave > 0.002
+    const A = inp.anc
+    const ancOn = !!A && A.gather > 0.001 && A.R > 0.01
     flow.update(t, hx, hy)
 
     for (let i = 0; i < this.n; i++) {
@@ -369,6 +373,28 @@ export class NotesSim {
         }
       }
 
+      // ANC: the field draws music in. Notes are the one thing allowed through the shell — no collision here.
+      if (ancOn && !isDash && mSlot < 0) {
+        const adx = x - A!.cx
+        const ady = y - A!.cy
+        const ar = Math.sqrt(adx * adx + ady * ady) + 1e-4
+        const g = A!.gather
+        const outside = Math.min(1, Math.max(0, (ar - A!.R * 0.9) / (A!.R * 1.3)))
+        const ux = adx / ar
+        const uy = ady / ar
+        ax += (-ux * 1.1 + -uy * 0.5) * g * outside * (0.6 + depth)
+        ay += (-uy * 1.1 + ux * 0.5) * g * outside * (0.6 + depth)
+        if (ar < A!.R) {
+          ax -= vx * 1.6 * g
+          ay -= vy * 1.6 * g
+          if (ar > A!.R * 0.85) {
+            const pull = (ar - A!.R * 0.85) * 7 * g
+            ax -= ux * pull
+            ay -= uy * pull
+          }
+        }
+      }
+
       // Formation spring (staggered per particle so they arrive like a flock, not a sheet).
       if (hold > 0) {
         const gain = hold * (0.55 + 0.9 * this.seed[i])
@@ -407,6 +433,8 @@ export class NotesSim {
     const worldPerPx = 2 / Math.max(inp.viewportH, 1)
     const scrollV = clamp(inp.scrollVelPx * worldPerPx, -9, 9)
     const beat = 0.5 + 0.5 * Math.cos(inp.t * Math.PI * 2) // 1 Hz heartbeat
+    const A = inp.anc
+    const ancOn = !!A && A.gather > 0.001 && A.R > 0.01
 
     for (let i = 0; i < this.n; i++) {
       const o4 = i * 4
@@ -432,7 +460,12 @@ export class NotesSim {
         b[o4 + 2] = lerp(0.2, 0.7, Wg)
         b[o4 + 3] = 0.45
       } else {
-        const recede = mSlot >= 0 ? 1 : 1 - 0.8 * Wg
+        let recede = mSlot >= 0 ? 1 : 1 - 0.8 * Wg
+        if (ancOn && mSlot < 0) {
+          const ex = this.x[i] - A!.cx
+          const ey = this.y[i] - A!.cy
+          recede *= ex * ex + ey * ey < A!.R * A!.R ? 1 + 0.9 * A!.gather : 1 - 0.5 * A!.gather
+        }
         const sz = this.baseSize[i]
         b[o4] = sz
         b[o4 + 1] = sz

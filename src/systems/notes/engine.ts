@@ -4,6 +4,8 @@ import { scrollCues } from './scrollCues'
 import { scrollSignal } from '../../lib/scroll'
 import { cursorSignal, tickCursor } from '../cursor/cursorSignal'
 import type { Tier } from '../../lib/tier'
+import { ancLive } from '../../scenes/ANC/live'
+import { ancLayout } from '../../scenes/ANC/state'
 
 /**
  * The notes engine: owns the sim and runs it once per shared-ticker frame.
@@ -21,6 +23,7 @@ class NotesEngine {
     viewportH: 1,
     cursor: { x: 0, y: 0, speed: 0, active: false },
     weights: conductor.weights,
+    anc: { gather: 0, cx: 0, cy: 0, R: 0 },
   }
   readonly stats = { simMs: 0, writeMs: 0, frames: 0, avgFrameMs: 16.7 }
   private listeners = new Set<(sim: NotesSim) => void>()
@@ -86,6 +89,13 @@ class NotesEngine {
     inp.cursor.x = (cursorSignal.x / this.viewportW - 0.5) * 2 * sim.aspect
     inp.cursor.y = -(cursorSignal.y / H - 0.5) * 2
     inp.cursor.speed = cursorSignal.speed * (2 / H)
+
+    const lay = ancLayout(sim.aspect)
+    const a = inp.anc!
+    a.gather = ancLive.state.gather * ancLive.vis
+    a.cx = lay.cx
+    a.cy = lay.cy
+    a.R = lay.rMax * ancLive.state.radius
 
     const t0 = performance.now()
     sim.step(dt, inp)

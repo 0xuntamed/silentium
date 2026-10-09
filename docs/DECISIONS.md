@@ -53,3 +53,36 @@ Short log of choices made while building. Big decisions are approved in the plan
 **Not measured (be honest):** real-GPU frame rate. Only CPU cost of the sim/writes is measured; the 60 fps target needs a check on real hardware.
 
 **Lighthouse (desktop, with the Stage lazy-loaded):** performance 88–97 across runs (TBT 140–290 ms), accessibility 100, best practices 100. The Stage chunk is 932 kB (249 kB gzip) — three + R3F; trim in Phase 7.
+
+## Phase 3 — ANC scene ("The world, on mute")
+
+**Architecture**
+- **`state.ts`** — the whole scene as a pure function of local progress, `ancAt(p)`. The DOM timeline (copy states, dB meter) and the WebGL pass both read it, so reverse scroll is exact.
+- **`AncStage.ts`** — imperative three.js, run as a render pass inside the shared canvas: ANC scene → premultiplied half-float render target → composite pass (bubble lens, rim, outside desaturation) → notes drawn on top. Built **lazily** (~2.5 viewports before the scene): building it at load (PMREM + shader compiles) cost ~20 Lighthouse points.
+- **Noise = closed-form projection flow** (`projection.ts` ↔ GLSL twin). Each streak flies a straight line past the head; a smooth radial max pushes it out of the bubble, so it rides the shell and leaves tangentially. A bias perpendicular to the path stops head-on particles flipping 180°. Streaks are 8-segment ribbons evaluating the same function along their trail, so tails bend round the bubble. Stateless, so scrubbing never accumulates error.
+- **Shell impacts without GPU readback:** 64 tracer particles are evaluated on the CPU each frame; contacts become up to 16 (angle, strength) pairs that flare and ripple the rim in the composite shader.
+- **Waves:** nine ribbons; outside the bubble they are jagged hashed noise, inside they are calm sines in brass (`calm = 1 − smoothstep(R·0.9, R·1.03, dist)`) — the shell is literally the filter. They start as the notes system's sheaf and "corrupt" over the first 10% of the scene.
+- **Notes pass through:** the notes sim gets `anc {gather, cx, cy, R}`: outside the shell they are drawn in and swirl, inside they slow and hold near 0.85 R, dimmer outside and brighter inside. There is no collision, which is the point.
+- **Headphones** are procedural (lathe cup, brass ring, cushion, tube band) lit by a PMREM'd `RoomEnvironment` — no HDRI file. The listener is an original gender-neutral side profile authored as béziers (`profile.ts`); the body fades out with vertex alpha so it dissolves instead of ending in an edge.
+- **Shake and grain** (`systems/grain`): shake is a `translate3d` on the GL layer, the near layer and the scene content; grain is a pre-rendered tile hopped around, `mix-blend-mode: overlay`. Both follow `noise`, which peaks at the click.
+- **Decorative words** (HONK, CHATTER, ENGINE, SIREN, BEEP, DRILL, SHOUT, ROAR) are sprites in a runtime atlas drawn with Geist, with RGB split and slice glitches; they are not copy.
+
+**Verified (Playwright, `npm run shots -- --anc-checks`)**
+- GPU↔CPU projection parity: worst error **1.6e-4** world units (< 0.1 px at 900 px tall) on both desktop and mobile tiers.
+- Reverse scroll: frames at p = 0.7 before and after scrubbing 0.3 → 0.5 → 0.7 are **byte-identical** (clocks frozen via `__sil.anc.snapshot`).
+- Unit tests (26 total): `ancAt` determinism and ordering; projection never enters the bubble, is continuous along the path including head-on particles, and continuous as the bubble grows.
+
+**Small decisions**
+- Head centre sits at 34% of the aspect on wide screens (copy left, figure right) and centred on phones; the bubble radius is capped to fit.
+- Colours inside the scene: noise `static` red → ash as the field comes up (`sat` 1 → 0.12); the only brass is music and the shell.
+- Chromatic fringe at the rim is deliberately tiny (0.0015 uv); at the first value it painted green/magenta halos on the waves.
+- Ribbons need `DoubleSide` — their winding flips with the direction of travel; with back-face culling half of them silently vanished.
+- **Reduced motion:** no pin and no loop. The Stage renders three stills (before / ANC on / after) once and the static layout shows them as images; the settled notes field is restored afterwards.
+- **Lite tier (phones):** 150 streaks, 56 sprites, no MSAA, no lens or ripple distortion (`uLite`).
+- Screen-shake amplitude is 3.4 px on fine pointers, 1.6 px elsewhere.
+
+**Not verified / known gaps**
+- Real-GPU frame rate: still unmeasured (software GL in the harness). The ANC pass adds one MSAA half-float target, one fullscreen composite, ~340 ribbons and ~170 sprites; check on your machine.
+- Lighthouse desktop (software GL, high variance): performance 75–99 across five runs, typically ≥ 95; accessibility 100; best practices 100.
+- The "−42 dB" copy beat and the Spatial hand-off are timing-matched, but Spatial's own rings are still the Phase 1 DOM skeleton.
+- The Stage chunk is 960 kB (259 kB gzip) with three + R3F + the ANC pass.

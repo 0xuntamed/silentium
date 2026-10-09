@@ -74,5 +74,5 @@ export function NearLayer2D() {
     }
   }, [])
 
-  return <canvas ref={ref} aria-hidden className="pointer-events-none fixed inset-0 z-30 h-full w-full" />
+  return <canvas id="near-layer" ref={ref} aria-hidden className="pointer-events-none fixed inset-0 z-30 h-full w-full" />
 }

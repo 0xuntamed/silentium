@@ -75,9 +75,8 @@ export type CueSpec = [scene: string, p: number, w: Partial<Weights>]
 export const SCROLL_CUES: CueSpec[] = [
   ['hero', 0.62, {}],
   ['hero', 0.95, { staff: 1 }],
-  ['anc', 0.03, { staff: 1 }],
-  ['anc', 0.1, { wave: 1 }],
-  ['anc', 0.2, {}],
+  ['anc', 0.0, { wave: 1 }],
+  ['anc', 0.08, {}],
   ['spatial', 0.9, {}],
   ['materials', 0.03, { outline: 1 }],
   ['materials', 0.14, { outline: 1 }],

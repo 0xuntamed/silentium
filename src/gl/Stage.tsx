@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useState } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
-import { gsap } from '../lib/gsap'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { gsap, ScrollTrigger } from '../lib/gsap'
 import { detectTier, type Tier } from '../lib/tier'
 import { engine } from '../systems/notes/engine'
 import { watchScrollCues } from '../systems/notes/scrollCues'
@@ -10,6 +10,14 @@ import { NotesField } from '../systems/notes/NotesField'
 import { NearLayer2D } from '../systems/notes/NearLayer2D'
 import { Cursor } from '../systems/cursor/Cursor'
 import { DebugPanel } from '../systems/notes/DebugPanel'
+import { scrollSignal } from '../lib/scroll'
+import { AncStage } from '../scenes/ANC/AncStage'
+import { ancLive, updateAncLive } from '../scenes/ANC/live'
+import { setAncStills } from '../scenes/ANC/stills'
+import { ShakeAndGrain } from '../systems/grain/ShakeAndGrain'
+
+/** Local progress points for the reduced-motion stills: before / ANC on / after. */
+const STILL_POINTS = [0.05, 0.5, 0.8]
 
 /** Fits an orthographic camera to world space (y ∈ [-1, 1], x ∈ [-aspect, aspect]) and drives the loop. */
 function Rig({ tier }: { tier: Tier }) {
@@ -17,6 +25,7 @@ function Rig({ tier }: { tier: Tier }) {
   const size = useThree((s) => s.size)
   const advance = useThree((s) => s.advance)
   const gl = useThree((s) => s.gl)
+  const anc = useRef<AncStage | null>(null)
 
   // Camera follows the viewport aspect.
   useLayoutEffect(() => {
@@ -32,20 +41,110 @@ function Rig({ tier }: { tier: Tier }) {
     cam.position.set(0, 0, 5)
     cam.updateProjectionMatrix()
     engine.resize(size.width, size.height)
+    anc.current?.resize(gl, aspect)
     if (tier.name === 'still') advance(performance.now())
-  }, [camera, size, advance, tier])
+  }, [camera, size, advance, tier, gl])
 
-  // One shared clock: gsap.ticker advances the sim, then the renderer.
+  // The ANC scene is a render pass inside this same canvas. It is built lazily (PMREM + shader
+  // compiles are not free), a couple of viewports before the visitor reaches the scene.
+  const sizeRef = useRef(size)
+  sizeRef.current = size
+  const ensureAnc = () => {
+    if (!anc.current) {
+      const stage = new AncStage(tier, gl, sizeRef.current.width / sizeRef.current.height)
+      anc.current = stage
+      void gl.compileAsync?.(stage.scene, camera)
+    }
+    return anc.current
+  }
+
+  useEffect(() => {
+    const w = window as unknown as { __sil?: Record<string, unknown> }
+    w.__sil = Object.assign(w.__sil ?? {}, {
+      anc: {
+        /** Pin the scene to a progress (or null to follow scroll). */
+        setP: (p: number | null) => {
+          ancLive.override = p
+          ensureAnc()
+        },
+        parity: (R = 0.45, u = 0.55) => ensureAnc().parity(gl, R, u),
+        /** Deterministic frame at progress p (noise clock frozen), as a PNG data URL. */
+        snapshot: (p: number) => {
+          const stage = ensureAnc()
+          ancLive.frozen = true
+          ancLive.override = p
+          updateAncLive(0, window.innerHeight)
+          stage.update(0, ancLive.state, 1, 0)
+          advance(performance.now())
+          return gl.domElement.toDataURL('image/png')
+        },
+        progress: () => ancLive.p,
+      },
+    })
+    return () => {
+      anc.current?.dispose()
+      anc.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gl, tier])
+
+  // Render order: ANC composite, then the notes on top. (A positive priority takes over rendering.)
+  useFrame(({ gl: renderer, scene, camera: cam }) => {
+    renderer.autoClear = false
+    renderer.setRenderTarget(null)
+    renderer.clear()
+    if (anc.current && ancLive.active) anc.current.render(renderer, cam)
+    renderer.render(scene, cam)
+  }, 1)
+
+  // One shared clock: gsap.ticker advances the scene state, the sim, then the renderer.
   useEffect(() => {
     gl.setClearColor(0x000000, 0)
     if (tier.name === 'still') {
+      // Reduced motion: no loop. Render three designed ANC stills, then one settled notes frame.
+      const urls: string[] = []
       engine.prewarm(240)
+      const a = engine.inputs.anc!
+      const stage = ensureAnc()
+      // The stills drive the notes through the bubble; keep the settled field to restore afterwards.
+      const sim = engine.sim!
+      const keep = { x: sim.x.slice(), y: sim.y.slice(), vx: sim.vx.slice(), vy: sim.vy.slice(), rot: sim.rot.slice() }
+      for (const p of STILL_POINTS) {
+        ancLive.override = p
+        updateAncLive(0, window.innerHeight)
+        a.gather = ancLive.state.gather
+        a.cx = stage.layout.cx
+        a.cy = stage.layout.cy
+        a.R = stage.layout.rMax * ancLive.state.radius
+        engine.prewarm(150)
+        stage.update(1 / 60, ancLive.state, 1, 2.5)
+        advance(performance.now())
+        urls.push(gl.domElement.toDataURL('image/png'))
+      }
+      setAncStills(urls)
+      ancLive.override = null
+      updateAncLive(0, window.innerHeight)
+      a.gather = 0
+      a.R = 0
+      sim.x.set(keep.x)
+      sim.y.set(keep.y)
+      sim.vx.set(keep.vx)
+      sim.vy.set(keep.vy)
+      sim.rot.set(keep.rot)
+      engine.prewarm(0)
       advance(performance.now())
       return
     }
     const tick = (time: number, deltaMs: number) => {
-      if (document.hidden) return
-      engine.frame(deltaMs / 1000)
+      if (document.hidden || ancLive.frozen) return
+      const dt = deltaMs / 1000
+      updateAncLive(scrollSignal.y, window.innerHeight)
+      if (!anc.current) {
+        const st = ScrollTrigger.getById('scene-anc')
+        if (st && scrollSignal.y > st.start - window.innerHeight * 2.5) ensureAnc()
+      }
+      engine.frame(dt)
+      if (anc.current && ancLive.active) anc.current.update(Math.min(dt, 0.05), ancLive.state, ancLive.vis, time)
       advance(time * 1000)
     }
     gsap.ticker.add(tick)
@@ -107,7 +206,7 @@ export default function Stage() {
 
   return (
     <>
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0">
+      <div id="gl-layer" aria-hidden className="pointer-events-none fixed inset-0 z-0">
         <Canvas
           orthographic
           frameloop="never"
@@ -120,6 +219,7 @@ export default function Stage() {
         </Canvas>
       </div>
       <NearLayer2D />
+      <ShakeAndGrain />
       {tier.name !== 'still' && <Cursor />}
       {showDebug && <DebugPanel />}
     </>
