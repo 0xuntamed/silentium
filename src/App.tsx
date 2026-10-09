@@ -4,6 +4,8 @@ import { ScrollTrigger } from './lib/gsap'
 import { startSmoothScroll } from './lib/lenis'
 import { hasEntered } from './lib/session'
 import { Nav } from './components/Nav'
+import { CartDrawer } from './components/CartDrawer'
+import { useCart } from './lib/cart'
 import { Silence } from './scenes/Intro/Silence'
 import { Hero } from './scenes/Hero/Hero'
 import { ANC } from './scenes/ANC/ANC'
@@ -20,6 +22,7 @@ const Stage = lazy(() => import('./gl/Stage'))
 export default function App() {
   const [stageReady, setStageReady] = useState(false)
   const [gate, setGate] = useState(!hasEntered())
+  const { open: cartOpen } = useCart()
 
   useEffect(() => startSmoothScroll(), [])
 
@@ -51,7 +54,8 @@ export default function App() {
       )}
       {gate && <Silence onDone={() => setGate(false)} />}
       <Nav />
-      <main id="top" inert={gate} className="relative z-[1]">
+      <CartDrawer />
+      <main id="top" inert={gate || cartOpen} className="relative z-[1]">
         <Hero />
         <ANC />
         <Spatial />

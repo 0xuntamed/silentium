@@ -81,8 +81,9 @@ export const SCROLL_CUES: CueSpec[] = [
   ['spatial', 1.0, { outline: 1 }],
   ['materials', 0.1, { outline: 1 }],
   ['materials', 0.2, {}],
-  ['cta', 0.0, {}],
-  ['cta', 0.7, { cable: 1 }],
+  ['reviews', 0.0, {}],
+  ['cta', 0.0, { staff: 1 }],
+  ['cta', 0.6, { cable: 1 }],
 ]
 
 /** Advance eased weights toward the target. Frame-rate independent. */

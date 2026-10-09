@@ -6,8 +6,9 @@ export const scrollCues: Cue[] = []
 
 function sceneY(scene: string, p: number): number | null {
   const st = ScrollTrigger.getById(`scene-${scene}`)
-  // Pinned scenes: ScrollTrigger knows where they start and end.
-  if (st && st.end - st.start > 50) return st.start + (st.end - st.start) * p
+  // Pinned scenes (and the tall Reviews section): ScrollTrigger knows where they start and end.
+  // The CTA is always measured from its element: p 0 = it enters the viewport, p 1 = its top reaches the top.
+  if (scene !== 'cta' && st && st.end - st.start > 50) return st.start + (st.end - st.start) * p
   // Unpinned sections: p 0 = section top enters the viewport, p 1 = it reaches the top.
   const el = document.getElementById(scene)
   if (!el) return null

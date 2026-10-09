@@ -13,6 +13,7 @@ export const nav = {
     { label: 'Space', scene: 'spatial' },
     { label: 'Craft', scene: 'materials' },
     { label: 'Numbers', scene: 'specs' },
+    { label: 'Voices', scene: 'reviews' },
   ],
   cart: 'Cart',
 }
@@ -96,6 +97,7 @@ export const specs = {
   index: '05',
   label: 'The numbers',
   title: ['Everything else', 'is a rounding error.'] as const,
+  matrixLabel: 'Playback · ANC on · full charge',
   items: [
     { big: '60', unit: 'h', note: 'Playback, ANC on' },
     { big: '−42', unit: 'dB', note: 'Peak cancellation' },
@@ -109,11 +111,16 @@ export const specs = {
 export const reviews = {
   index: '06',
   label: 'Listener notes',
+  title: ['The quiet,', 'reviewed.'] as const,
   note: 'Placeholder copy — fictional listeners.',
+  railLabel: 'Listener notes. Drag, or use the left and right arrow keys, to browse.',
   items: [
     { quote: 'The first time the room went away I took them off to check. It had not.', who: 'A. Marlow', role: 'Sound editor', rating: 5 },
     { quote: 'Quiet without the pressure. Music arrives like it was already there.', who: 'J. Okafor', role: 'Commuter', rating: 5 },
     { quote: 'Engineered like a watch. Sounds like nothing in the way.', who: 'R. Lindqvist', role: 'Mastering engineer', rating: 5 },
+    { quote: 'I stopped noticing the flight. Then I noticed I had stopped noticing.', who: 'S. Varga', role: 'Frequent flyer', rating: 5 },
+    { quote: 'The spatial mode finds the room in a mix I have heard a thousand times.', who: 'T. Nakamura', role: 'Producer', rating: 5 },
+    { quote: 'Brass finish, leather that ages well, a click that feels like it cost something.', who: 'E. Dubois', role: 'Product designer', rating: 4 },
   ],
 }
 
@@ -122,10 +129,36 @@ export const cta = {
   title: ['Hear only what', 'matters.'] as const,
   primary: 'Shop SILENTIUM One',
   price: 'From $449',
-  secondary: 'Meet Buds',
+  secondary: 'Add Buds',
+  secondaryPrice: '$199',
 }
+
+export const newsletter = {
+  title: 'Quiet letters, rarely.',
+  body: 'New finishes, firmware, and the occasional silence. No more than one a month.',
+  label: 'Email address',
+  placeholder: 'you@example.com',
+  submit: 'Subscribe',
+  invalid: 'That does not look like an email address.',
+  done: 'Thank you. The next letter finds you quietly.',
+  demo: 'Demo only: nothing is sent or stored.',
+}
+
+export const cart = {
+  title: 'Your cart',
+  empty: 'Nothing here yet. Silence is free; the rest is $449.',
+  close: 'Close cart',
+  subtotal: 'Subtotal',
+  checkout: 'Checkout',
+  demo: 'This is a concept site: checkout is not connected.',
+  remove: 'Remove',
+  finish: 'Finish',
+}
+
+export const menu = { open: 'Menu', close: 'Close', label: 'Main menu' }
 
 export const footer = {
   line: 'SILENTIUM — Quiet, by design.',
+  top: 'Back to top',
   fine: '© 2026 SILENTIUM. A concept brand; all names, specs and reviews are placeholders.',
 }

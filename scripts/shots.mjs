@@ -10,6 +10,7 @@ const reduced = process.argv.includes('--reduced')
 const notesOnly = process.argv.includes('--notes')
 const ancChecks = process.argv.includes('--anc-checks')
 const withSound = process.argv.includes('--sound')
+const p5 = process.argv.includes('--p5-checks')
 const out = 'shots'
 rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })
@@ -70,6 +71,70 @@ try {
       continue
     }
 
+    if (p5) {
+      const fail = (m) => { errors.push('[' + vp.name + '] ' + m); console.log(vp.name, 'FAIL:', m) }
+      const ok = (m) => console.log(vp.name, 'ok:', m)
+      await page.evaluate(() => window.__sil.enter())
+      await page.waitForTimeout(2200)
+      // Reviews rail drifts and can be dragged.
+      await page.mouse.move(4, 4) // the gate click left the pointer over the rail, which pauses it by design
+      await page.evaluate(() => document.getElementById('reviews').scrollIntoView())
+      await page.waitForTimeout(1500)
+      const t0 = await page.evaluate(() => document.querySelector('#reviews [role=region] > div').style.transform)
+      await page.waitForTimeout(2500)
+      const t1 = await page.evaluate(() => document.querySelector('#reviews [role=region] > div').style.transform)
+      t0 !== t1 ? ok('reviews rail drifts (' + t0 + ' -> ' + t1 + ')') : fail('reviews rail did not move')
+      await page.screenshot({ path: tag('p5-reviews') })
+      // CTA: add to cart, drawer, focus, escape.
+      await page.evaluate(() => document.getElementById('cta').scrollIntoView())
+      await page.waitForTimeout(2500)
+      await page.screenshot({ path: tag('p5-cta') })
+      const primary = page.getByRole('button', { name: /Shop SILENTIUM One/ })
+      await primary.click()
+      await page.waitForTimeout(900)
+      const dialog = page.getByRole('dialog', { name: /Your cart/ })
+      ;(await dialog.count()) === 1 ? ok('cart drawer opens') : fail('cart drawer did not open')
+      const label = await page.locator('header button[aria-label^="Cart"]').getAttribute('aria-label')
+      ;/1 item/.test(label ?? '') ? ok('nav cart count: ' + label) : fail('nav cart count wrong: ' + label)
+      const inert = await page.evaluate(() => document.querySelector('main').hasAttribute('inert'))
+      inert ? ok('page is inert behind the drawer') : fail('main not inert while cart open')
+      const focusInside = await page.evaluate(() => !!document.activeElement?.closest('[role=dialog]'))
+      focusInside ? ok('focus moved into the drawer') : fail('focus not in drawer')
+      await page.screenshot({ path: tag('p5-cart') })
+      await page.getByRole('button', { name: 'Increase SILENTIUM One quantity' }).click()
+      await page.waitForTimeout(300)
+      const sub = await page.evaluate(() => document.querySelector('[role=dialog] footer').innerText)
+      sub.includes('$898') ? ok('subtotal updates: $898') : fail('subtotal wrong: ' + sub.split('\n').join(' '))
+      await page.keyboard.press('Escape')
+      await page.waitForTimeout(900)
+      ;(await dialog.count()) === 0 ? ok('Escape closes the drawer') : fail('drawer still open after Escape')
+      const back = await page.evaluate(() => document.activeElement?.textContent?.includes('Shop SILENTIUM One'))
+      back ? ok('focus returned to the button that opened it') : fail('focus not restored')
+      // Newsletter.
+      const input = page.getByLabel('Email address')
+      await input.fill('nope')
+      await page.getByRole('button', { name: 'Subscribe' }).click()
+      await page.waitForTimeout(500)
+      ;(await page.getByText('does not look like an email').count()) ? ok('invalid email rejected') : fail('no error for invalid email')
+      await input.fill('me@example.com')
+      await page.getByRole('button', { name: 'Subscribe' }).click()
+      await page.waitForTimeout(700)
+      ;(await page.getByText('Thank you.').count()) ? ok('valid email accepted') : fail('no thanks for valid email')
+      await page.screenshot({ path: tag('p5-footer') })
+      if (vp.mobile) {
+        await page.evaluate(() => window.scrollTo(0, 0))
+        await page.waitForTimeout(600)
+        await page.getByRole('button', { name: 'Menu' }).click()
+        await page.waitForTimeout(900)
+        await page.screenshot({ path: tag('p5-menu') })
+        await page.getByRole('dialog', { name: 'Main menu' }).getByRole('button', { name: /Numbers/ }).click()
+        await page.waitForTimeout(2500)
+        const y = await page.evaluate(() => window.scrollY)
+        y > 1000 ? ok('menu link scrolls to the scene (y=' + Math.round(y) + ')') : fail('menu link did not scroll: ' + y)
+      }
+      await ctx.close()
+      continue
+    }
     if (ancChecks) {
       await page.evaluate(() => window.__sil.enter())
       await page.waitForTimeout(2500)
