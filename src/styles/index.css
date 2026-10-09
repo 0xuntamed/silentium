@@ -1,0 +1,232 @@
+@import 'tailwindcss';
+@import 'lenis/dist/lenis.css';
+@import './fonts.css';
+
+@theme {
+  --color-basalt: #0b0b0c;
+  --color-graphite: #141416;
+  --color-slate: #1e1e21;
+  --color-fog: #6f6c66;
+  --color-ash: #a8a39a;
+  --color-bone: #efe9dd;
+  --color-brass: #c6a15b;
+  --color-static: #f2542d;
+
+  --font-display: 'Instrument Serif', 'Instrument Serif Fallback', 'Times New Roman', serif;
+  --font-sans: 'Geist', 'Geist Fallback', system-ui, sans-serif;
+
+  --ease-hush: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-exhale: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+:root {
+  --gutter: clamp(1.25rem, 3.2vw, 3rem);
+  --beat: 1s; /* the 60 bpm heartbeat every pulse is locked to */
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    background: var(--color-basalt);
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--color-basalt);
+    color: var(--color-bone);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.5;
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: clip;
+  }
+  ::selection {
+    background: var(--color-brass);
+    color: var(--color-basalt);
+  }
+  :focus-visible {
+    outline: 1.5px solid var(--color-brass);
+    outline-offset: 4px;
+    border-radius: 2px;
+  }
+  em {
+    font-family: var(--font-display);
+    font-style: italic;
+  }
+  button {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+@layer components {
+  /* Display type — Instrument Serif, tight and large. */
+  .display-xl {
+    font-family: var(--font-display);
+    font-size: clamp(4.25rem, 15.4vw, 17.5rem);
+    line-height: 0.86;
+    letter-spacing: -0.035em;
+    font-weight: 400;
+  }
+  .display-l {
+    font-family: var(--font-display);
+    font-size: clamp(3.1rem, 9.2vw, 9.75rem);
+    line-height: 0.9;
+    letter-spacing: -0.03em;
+    font-weight: 400;
+  }
+  .display-m {
+    font-family: var(--font-display);
+    font-size: clamp(2.4rem, 5.6vw, 5.75rem);
+    line-height: 0.95;
+    letter-spacing: -0.025em;
+    font-weight: 400;
+  }
+  .body-l {
+    font-size: clamp(1.02rem, 1.3vw, 1.3rem);
+    line-height: 1.55;
+    color: var(--color-ash);
+    max-width: 34em;
+  }
+  /* Technical voice — small, tracked, tabular. */
+  .label {
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    line-height: 1.3;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-ash);
+  }
+  .label-bone {
+    color: var(--color-bone);
+  }
+  .label-brass {
+    color: var(--color-brass);
+  }
+  .hairline {
+    border-color: color-mix(in srgb, var(--color-bone) 12%, transparent);
+  }
+
+  /* One scene = a full-viewport stage that GSAP may pin. */
+  .scene {
+    position: relative;
+    height: 100svh;
+    width: 100%;
+    overflow: clip;
+  }
+  .scene-inner {
+    position: relative;
+    height: 100%;
+    padding: max(calc(var(--gutter) * 2.2), 7.25rem) var(--gutter) calc(var(--gutter) * 1.4);
+  }
+  /* States stacked on one spot while motion is on; flow normally when reduced. */
+  .stack {
+    display: grid;
+  }
+  .stack > * {
+    grid-area: 1 / 1;
+  }
+  /* Registration marks (Teenage-Engineering precision). */
+  .reg {
+    position: absolute;
+    width: 11px;
+    height: 11px;
+    pointer-events: none;
+    opacity: 0.5;
+  }
+  .reg::before,
+  .reg::after {
+    content: '';
+    position: absolute;
+    background: var(--color-bone);
+  }
+  .reg::before {
+    left: 5px;
+    top: 0;
+    width: 1px;
+    height: 11px;
+  }
+  .reg::after {
+    top: 5px;
+    left: 0;
+    height: 1px;
+    width: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene {
+    height: auto;
+    min-height: 100svh;
+  }
+  .stack > * {
+    grid-area: auto;
+  }
+  .stack {
+    display: block;
+  }
+  .stack > * + * {
+    margin-top: 2.5rem;
+  }
+}
+
+@keyframes beat {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  12% {
+    transform: scale(1.7);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .beat {
+    animation: none !important;
+  }
+}
+.beat {
+  animation: beat var(--beat) cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+html.is-locked,
+html.is-locked body {
+  overflow: hidden;
+}
+
+/* Hero wordmark: sized so the nine letters span the viewport edge to edge. */
+.wordmark {
+  font-family: var(--font-display);
+  font-size: 25.4vw;
+  line-height: 0.8;
+  letter-spacing: -0.035em;
+  font-weight: 400;
+  margin-left: -0.04em;
+}
+.char-mask {
+  display: inline-block;
+  overflow: clip;
+  padding: 0.1em 0 0.04em;
+  margin: -0.1em 0 -0.04em;
+}
