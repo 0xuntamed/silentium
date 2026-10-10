@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { LazyMotion, MotionConfig, domAnimation } from 'motion/react'
 import { ScrollTrigger } from './lib/gsap'
 import { scrollToScene, startSmoothScroll } from './lib/lenis'
@@ -70,11 +70,16 @@ export default function App() {
 
   useEffect(() => startSmoothScroll(), [])
 
+  // The WebGL stage is decoration on the reading pages (compare, 404): let them become interactive first.
+  // Everywhere else it is the point of the page, so it starts as soon as the browser is idle.
   useEffect(() => {
     const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }
     const go = () => setStageReady(true)
-    if (w.requestIdleCallback) w.requestIdleCallback(go, { timeout: 1500 })
-    else setTimeout(go, 400)
+    const early = route === '/' || route === '/one' || route === '/buds'
+    const delay = early ? 0 : 4500
+    const t = window.setTimeout(() => (w.requestIdleCallback ? w.requestIdleCallback(go, { timeout: early ? 1500 : 3000 }) : go()), delay)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Webfonts change text metrics, which moves every pin: re-measure once they land.
@@ -84,11 +89,14 @@ export default function App() {
   }, [])
 
   // Each route has its own title and description; the pinned landing needs a re-measure on the way in.
+  const firstRoute = useRef(true)
   useEffect(() => {
     const t = TITLES[path] ?? { title: 'Not found — SILENTIUM', description: TITLES['/'].description }
     document.title = t.title
     document.querySelector('meta[name="description"]')?.setAttribute('content', t.description)
-    const raf = requestAnimationFrame(() => ScrollTrigger.refresh())
+    // The first mount is measured by the scenes themselves; only later route changes need a re-measure.
+    const raf = firstRoute.current ? 0 : requestAnimationFrame(() => ScrollTrigger.refresh())
+    firstRoute.current = false
     const scene = takePendingScene()
     const timer = scene ? window.setTimeout(() => scrollToScene(scene), 450) : 0
     return () => {

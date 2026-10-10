@@ -121,3 +121,64 @@ Short log of choices made while building. Big decisions are approved in the plan
 - **Bundle:** the main chunk is 486 kB (165 kB gzip); three.js, R3F and every 3D scene sit in the lazy Stage chunk (974 kB / 264 kB gzip). A slip put three.js in the main chunk (867 kB) via a constants import from `model.ts`; fixed by `Materials/constants.ts`.
 - **Lighthouse (desktop, software GL, noisy machine):** same-session A/B — Phase 3 commit 73–74 (TBT ~700 ms), Phase 4 81–87 (TBT 310–420 ms); accessibility 100, best practices 100 throughout. Earlier sessions measured 75–99 for Phase 3 on the same hardware, so absolute numbers drift with machine load; the target of ≥ 85 is met on the better runs, not reliably. Phase 7 will code-split and defer more.
 - Fixed along the way: my hand-written unlayered `.sr-only` overrode Tailwind's `not-sr-only` variants (the reduced-motion part index was invisible); removed it in favour of Tailwind's.
+
+## Phase 5 — Landing end-scenes, cart, newsletter (finished and verified)
+
+Specs (dot-matrix readout + odometers), Reviews (drag/keyboard rail), CTA, cart drawer and newsletter were committed mid-phase; this pass verified them. `npm run shots -- --p5-checks` passes at both widths (drawer focus trap, `inert` page behind it, Escape closes and restores focus, subtotal, newsletter validation, menu scroll). One check was a 500 ms timing flake under software GL (Framer's `mode="wait"` exit); the wait is now 1.5 s.
+
+## Phase 6 — Routing, product pages, compare
+
+**What shipped**
+- **Router** (`src/lib/router.ts`, ~100 lines, no dependency). The plan deferred react-router for Node-version reasons; four flat routes don't need it. `/`, `/one`, `/buds`, `/compare`, anything else → a designed 404. Real `<a href>` links (`components/Link.tsx`) so middle-click and copy-link work. A basalt **curtain** covers the page, the route swaps behind it (pinned scenes unmount, so the layout jumps), then it lifts; with reduced motion the swap is instant. Back/forward work. Deep links to product pages skip the silent intro (it belongs to the front door). Nav scene links from other pages go to `/` and scroll there once it has mounted.
+- **One `ProductPage` for both products**, driven by `src/content/products.ts`. Spec rows carry *both* products, so the product spec grid and the compare table come from one array and cannot disagree.
+- **360° view** (`scenes/Product/`). The model is drawn by the same shared WebGL stage as the landing (no second context). Mouse drag (also tilts), touch (horizontal; vertical still scrolls the page), arrow keys on the focused view (Shift = 90°), a **Rotate slider**, Front/Side/Back/Top presets, an **Explode / Assemble** toggle, auto-turn after 3.2 s idle (never under reduced motion). The model rides up and fades as the page scrolls. `viewLive.ts` holds the state and is three-free.
+- **Finish switcher** reuses the landing's Basalt / Bone / Brass material easing; the cart line gets the chosen finish.
+- **SILENTIUM Buds** model (`budsModel.ts`): procedural, 21 named parts (open case, lid on a hinge, two buds with tips, drivers, cells, mics, touch plates). Same contract as `buildHeadphones()` — `ProductStage` now takes the model as a parameter.
+- **Compare page**: a real `<table>` (caption, column and row headers), sticky header, "show only differences" toggle (Framer layout), a finish picker for the cart buttons, original line-art silhouettes. Mobile keeps the table (two narrow columns) rather than turning it into cards.
+- **Also:** sticky buy bar once the hero has scrolled away, "In the box", an anatomy list (real text for the exploded view), `Footer` extracted from the CTA, route-aware nav (product links appear at ≥ 1280 px on the landing, a "Shop" link from 768 px, everything in the phone menu).
+
+**Small decisions**
+- Buds explode offsets are halved (`EXPLODE` in `budsModel.ts`): they are small and the cluster has to stay framed.
+- On the reading pages (product, compare) the notes dim by 55 % (`engine.dim()`), because body copy over a full-strength field is hard to read. They keep drifting and still react to scroll and cursor.
+- The product view is not pinned or scrubbed; it is interactive. The one GSAP-per-scene rule applies to the landing's pinned scenes; product pages use Framer `whileInView` reveals.
+- The cart's finish for "Add Buds" on the landing is still the finish chosen in Craft.
+- **Hosting:** it is a client-side router, so the host must rewrite unknown paths to `index.html`. `public/_redirects` (Netlify/Cloudflare) and `vercel.json` are included; `vite dev`/`preview` already do this.
+
+**Reduced motion on the product pages:** no loop and no auto-turn, but the controls work — the Stage redraws on demand when the angle, finish or explode state changes (`tickView(…, snap)`), and re-stamps the still notes field when the route changes.
+
+**Tests (60 total):** router table; spec rows complete and unique; Buds model has 21 uniquely named, ordered, mirrored parts; the view eases and settles, auto-turns only when idle and not under reduced motion, explodes, fades out on scroll, and `snap` jumps.
+
+**Verified (`node scripts/pages.mjs`, desktop 1440 + mobile 390, also `--reduced`)**: titles and a single `h1` per page; finish switch; explode toggle; arrow-key and mouse-drag rotation; add-to-cart carries the finish; no horizontal overflow; compare filter (22 → 16 rows); landing → `/one` → back; 404. No console or page errors.
+
+## Phase 7 — Polish, performance, accessibility
+
+**Accessibility (`node scripts/a11y.mjs`, axe-core 4.14, WCAG 2 A/AA + best-practice).** 34 audits — landing at six scroll positions, intro gate, `/one`, `/buds`, `/compare`, 404; desktop and mobile; motion and reduced — **zero violations**. Lighthouse had been scoring a11y 100 while axe found real issues, now fixed:
+- `fog` text token `#6f6c66` → `#8a867e` (3.76 → 5.4:1 on basalt; ≥ 4.5:1 on graphite).
+- `ul[role=radiogroup] > li` (invalid list semantics) → `div` + buttons.
+- SplitText put `aria-label` on a `<p>`; now `aria: 'none'` (the real text is read).
+- The skip link pointed at `#hero`, which doesn't exist off the landing → `#top` (`<main tabindex="-1">`).
+
+**Performance (Lighthouse 13.5, desktop preset, production build, software GL — see caveat).**
+
+| Route | Before | After |
+|---|---|---|
+| `/` | 75 (TBT 650 ms) | **90–95** (TBT 190–250 ms) |
+| `/compare` | 68 (TBT 1.8 s) | **100** (TBT 0) |
+| `/one`, `/buds` | 69 (TBT 1.8 s) | **69–70** (TBT 1.4 s) |
+
+What moved it (found with `scripts/profile.mjs`, a 4×-throttled CPU profile):
+- The film-grain tile was built synchronously with a GPU-backed 2D canvas (≈ 750 ms at 4×). Now 128 px, created on idle, encoded with `toBlob`, mounted only on the landing. Atlas/grain canvases use `willReadFrequently` (software canvas, no GPU init).
+- An extra `ScrollTrigger.refresh()` on first route mount was removed (the scenes measure themselves).
+- On compare and 404 the WebGL stage is decoration, so it now starts 4.5 s after load.
+- Landing and product routes are code-split: main chunk 509 → 373 kB (118 kB gzip); the product and compare pages are 12 kB and 7 kB.
+
+**Not met, and why:** `/one` and `/buds` stay near 70 in the lab. There the 3D model *is* the content, so the stage must start immediately, and in this environment creating the WebGL context (~620 ms at 4×) and first-use shader compilation (~440 ms) run on SwiftShader, a software rasteriser. A real GPU does both in a small fraction of that, but **I have not measured that**: no real-GPU run was possible here. A line-drawing poster holds the place until the model loads (it fades by the model's visibility), so the page is never empty. To raise the lab number honestly you would have to delay the model past Lighthouse's quiet window, which would make the page worse. Please run Lighthouse on your own machine.
+
+**Other**
+- `index.html`: Open Graph tags and a `<noscript>` line. No sitemap: it needs the production domain.
+- README added (run, routes, structure, checks).
+
+**Still not verified (be honest)**
+- Real-GPU frame rate on every route, including the Buds and the product view. Sound has still not been listened to (Phase 4).
+- Safari and Firefox were not tested; only Chromium via Playwright.
+- Real-device touch behaviour of the 360° drag (horizontal drag rotates; vertical scrolls) was emulated, not tried on a phone.

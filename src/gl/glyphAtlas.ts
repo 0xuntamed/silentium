@@ -122,7 +122,7 @@ export function buildAtlas(): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.width = CELL * COLS
   canvas.height = CELL * ROWS
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!
   ctx.fillStyle = '#fff'
   ctx.strokeStyle = '#fff'
   ctx.lineCap = 'round'
@@ -144,7 +144,7 @@ export function buildNearSprites(atlas: HTMLCanvasElement, blurPx = 16): { sprit
   const canvas = document.createElement('canvas')
   canvas.width = atlas.width
   canvas.height = atlas.height
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!
   const blurred = 'filter' in ctx
   for (let i = 0; i < 7; i++) {
     const cx = (i % COLS) * CELL

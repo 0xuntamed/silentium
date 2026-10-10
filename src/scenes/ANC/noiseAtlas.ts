@@ -17,7 +17,7 @@ export async function buildWordAtlas(): Promise<HTMLCanvasElement> {
   const canvas = document.createElement('canvas')
   canvas.width = WORD_CELL_W * WORD_COLS
   canvas.height = WORD_CELL_H * WORD_ROWS
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!
   ctx.fillStyle = '#fff'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'

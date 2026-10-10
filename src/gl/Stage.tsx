@@ -14,7 +14,7 @@ import { ancLive, updateAncLive } from '../scenes/ANC/live'
 import { setAncStills } from '../scenes/ANC/stills'
 import { productLive, setFinishIndex, setProductStills, updateProductLive } from '../scenes/Materials/live'
 import { spatialLive, updateSpatialLive } from '../scenes/Spatial/live'
-import { subscribeRouter } from '../lib/router'
+import { subscribeRouter, useRouter } from '../lib/router'
 import { subscribeView, viewLive } from '../scenes/Product/viewLive'
 import { ShakeAndGrain } from '../systems/grain/ShakeAndGrain'
 import { Passes } from './Passes'
@@ -225,6 +225,7 @@ function Rig({ tier }: { tier: Tier }) {
 
 /** The persistent stage: one WebGL context for the whole site, behind the DOM; near notes in front. */
 export default function Stage() {
+  const { path } = useRouter()
   const [tier] = useState(() => {
     const t = detectTier()
     engine.create(t, window.innerWidth, window.innerHeight)
@@ -288,7 +289,7 @@ export default function Stage() {
         </Canvas>
       </div>
       <NearLayer2D />
-      <ShakeAndGrain />
+      {path === '/' && <ShakeAndGrain />}
       {tier.name !== 'still' && <Cursor />}
       {showDebug && <DebugPanel />}
     </>

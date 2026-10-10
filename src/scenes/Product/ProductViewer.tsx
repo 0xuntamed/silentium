@@ -1,6 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent } from 'react'
 import { gsap } from '../../lib/gsap'
 import { productUi } from '../../content/products'
+import { Silhouette } from '../../components/Silhouette'
 import { dragView, normaliseAngle, nudgeView, setExplode, setViewAngle, viewLive, useViewField } from './viewLive'
 import type { ProductCopy } from '../../content/products'
 
@@ -15,6 +16,7 @@ export function ProductViewer({ product }: { product: ProductCopy }) {
   const surface = useRef<HTMLDivElement>(null)
   const slider = useRef<HTMLInputElement>(null)
   const readout = useRef<HTMLOutputElement>(null)
+  const poster = useRef<HTMLDivElement>(null)
   const last = useRef<{ x: number; y: number } | null>(null)
   const exploded = useViewField((l) => l.explodeTarget > 0.5)
 
@@ -24,6 +26,8 @@ export function ProductViewer({ product }: { product: ProductCopy }) {
       const deg = Math.round((normaliseAngle(viewLive.rotY) * 180) / Math.PI) % 360
       if (slider.current && document.activeElement !== slider.current) slider.current.value = String(deg)
       if (readout.current) readout.current.textContent = `${deg}°`
+      // A line-drawing poster holds the place until the 3D model has loaded, then fades out.
+      if (poster.current) poster.current.style.opacity = String(Math.max(0, 1 - viewLive.vis * 1.6).toFixed(3))
     }
     tick()
     gsap.ticker.add(tick)
@@ -82,6 +86,9 @@ export function ProductViewer({ product }: { product: ProductCopy }) {
         onKeyDown={key}
         className="group relative min-h-[20rem] flex-1 cursor-grab touch-pan-y select-none active:cursor-grabbing"
       >
+        <div ref={poster} aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center text-bone/30">
+          <Silhouette id={product.id} decorative className="h-1/2 max-h-72 w-auto" />
+        </div>
         <p id="viewer-alt" className="sr-only">
           {product.viewAlt}
         </p>
