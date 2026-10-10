@@ -8,6 +8,8 @@ import { ancLive } from '../../scenes/ANC/live'
 import { bloom } from './bloom'
 import { ancLayout } from '../../scenes/ANC/state'
 import { productLive } from '../../scenes/Materials/live'
+import { getRouter } from '../../lib/router'
+import { viewLive } from '../../scenes/Product/viewLive'
 import { spatialLive } from '../../scenes/Spatial/live'
 
 /**
@@ -101,7 +103,8 @@ class NotesEngine {
     inp.cursor.y = -(cursorSignal.y / H - 0.5) * 2
     inp.cursor.speed = cursorSignal.speed * (2 / H)
 
-    inp.dim = Math.max(productLive.state.vis, spatialLive.active ? spatialLive.vis * 0.7 : 0)
+    // Reading pages (product, compare): keep the notes, but quieter than the copy.
+    inp.dim = Math.max(getRouter().path === '/' ? 0 : 1, productLive.state.vis, viewLive.state.vis * 0.8, spatialLive.active ? spatialLive.vis * 0.7 : 0)
     const lay = ancLayout(sim.aspect)
     const a = inp.anc!
     a.gather = ancLive.state.gather * ancLive.vis

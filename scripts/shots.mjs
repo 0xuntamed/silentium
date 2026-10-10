@@ -33,7 +33,7 @@ await build({ mode: 'test', logLevel: 'warn', build: { outDir: 'dist-test', empt
 const server = await preview({ mode: 'test', logLevel: 'warn', build: { outDir: 'dist-test' }, preview: { port: 4174, strictPort: true } })
 const url = server.resolvedUrls.local[0]
 
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
 const errors = []
 try {
   for (const vp of VIEWPORTS) {

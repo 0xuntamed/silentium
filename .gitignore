@@ -4,3 +4,4 @@ dist-test
 shots
 *.log
 .DS_Store
+shots-pages

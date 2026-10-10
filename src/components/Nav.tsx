@@ -6,10 +6,21 @@ import { bezier } from '../lib/easings'
 import { count, openCart, useCart } from '../lib/cart'
 import { getLenis, scrollToScene, scrollToY } from '../lib/lenis'
 import { useEntered } from '../lib/session'
+import { navigate, useRouter } from '../lib/router'
+import { Link } from './Link'
 import { SoundToggle } from './SoundToggle'
 
+const SHOP = [
+  { label: 'One', to: '/one' },
+  { label: 'Buds', to: '/buds' },
+  { label: 'Compare', to: '/compare' },
+]
+
+/** Scene links go to the landing first when you are on another page. */
+const goScene = (scene: string, onLanding: boolean) => (onLanding ? scrollToScene(scene) : navigate('/', { scene }))
+
 /** The phone menu: a full-screen modal with the same links, in display type. */
-function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
+function MobileMenu({ open, onClose, onLanding }: { open: boolean; onClose: () => void; onLanding: boolean }) {
   const first = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -45,26 +56,36 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
           <button ref={first} type="button" onClick={onClose} className="label label-bone absolute right-[var(--gutter)] top-5 py-2">
             {menu.close}
           </button>
-          <ul className="mt-6 flex flex-col">
-            {nav.links.map((l, i) => (
+          <ul className="mt-6 flex flex-col overflow-y-auto">
+            {[
+              ...nav.links.map((l) => ({ key: l.scene, label: l.label, scene: l.scene, to: '' })),
+              ...SHOP.map((l) => ({ key: l.to, label: l.label, scene: '', to: l.to })),
+            ].map((l, i) => (
               <m.li
-                key={l.scene}
+                key={l.key}
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: 0.1 + i * 0.06, ease: bezier.hush }}
+                transition={{ duration: 0.7, delay: 0.1 + i * 0.05, ease: bezier.hush }}
                 className="border-b hairline"
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose()
-                    window.setTimeout(() => scrollToScene(l.scene), 60)
-                  }}
-                  className="display-m flex w-full items-baseline justify-between py-5 text-left"
-                >
-                  {l.label}
-                  <span className="label text-fog">{String(i + 2).padStart(2, '0')}</span>
-                </button>
+                {l.to ? (
+                  <Link to={l.to} onClick={onClose} className="display-m flex w-full items-baseline justify-between py-3.5 text-left">
+                    {l.label}
+                    <span className="label text-brass">→</span>
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose()
+                      window.setTimeout(() => goScene(l.scene, onLanding), 60)
+                    }}
+                    className="display-m flex w-full items-baseline justify-between py-3.5 text-left"
+                  >
+                    {l.label}
+                    <span className="label text-fog">{String(i + 2).padStart(2, '0')}</span>
+                  </button>
+                )}
               </m.li>
             ))}
           </ul>
@@ -82,41 +103,65 @@ export function Nav() {
   const { items } = useCart()
   const n = count(items)
   const [menuOpen, setMenuOpen] = useState(false)
+  const { path } = useRouter()
+  const onLanding = path === '/'
 
   return (
     <>
       <m.header
-        className="fixed inset-x-0 top-0 z-50 flex items-center justify-between px-[var(--gutter)] py-4"
+        className={`fixed inset-x-0 top-0 z-50 flex items-center justify-between px-[var(--gutter)] py-4 ${onLanding ? '' : 'bg-gradient-to-b from-basalt via-basalt/80 to-transparent'}`}
         initial={{ opacity: 0, y: -12 }}
         animate={entered ? { opacity: 1, y: 0 } : { opacity: 0, y: -12 }}
         transition={{ duration: 1.1, ease: bezier.hush, delay: 0.9 }}
       >
-        <a
-          href="#top"
+        <Link
+          to="/"
           onClick={(e) => {
-            e.preventDefault()
-            scrollToY(0)
+            if (onLanding) {
+              e.preventDefault()
+              scrollToY(0)
+            }
           }}
           className="font-display text-[1.6rem] leading-none tracking-[-0.02em]"
-          aria-label="SILENTIUM — back to top"
+          aria-label={onLanding ? 'SILENTIUM — back to top' : 'SILENTIUM — home'}
         >
           SILENTIUM
-        </a>
+        </Link>
 
         <nav aria-label="Primary" className="hidden md:block">
-          <ul className="flex items-center gap-9">
-            {nav.links.map((l) => (
+          <ul className="flex items-center gap-7 lg:gap-9">
+            {(onLanding ? nav.links : [{ label: 'Story', scene: 'top' }]).map((l) => (
               <li key={l.scene}>
                 <a
-                  href={`#${l.scene}`}
+                  href={onLanding ? `#${l.scene}` : '/'}
                   onClick={(e) => {
                     e.preventDefault()
-                    scrollToScene(l.scene)
+                    if (l.scene === 'top') navigate('/')
+                    else goScene(l.scene, onLanding)
                   }}
                   className="label transition-colors hover:text-bone"
                 >
                   {l.label}
                 </a>
+              </li>
+            ))}
+            <li aria-hidden className={`h-3 w-px bg-bone/20 ${onLanding ? 'hidden xl:block' : ''}`} />
+            {onLanding && (
+              <li className="xl:hidden">
+                <Link to="/one" className="label label-brass transition-colors hover:text-bone">
+                  Shop
+                </Link>
+              </li>
+            )}
+            {SHOP.map((l) => (
+              <li key={l.to} className={onLanding ? 'hidden xl:block' : ''}>
+                <Link
+                  to={l.to}
+                  aria-current={path === l.to ? 'page' : undefined}
+                  className={`label transition-colors hover:text-bone ${path === l.to ? 'label-brass' : ''}`}
+                >
+                  {l.label}
+                </Link>
               </li>
             ))}
           </ul>
@@ -141,7 +186,7 @@ export function Nav() {
           </button>
         </div>
       </m.header>
-      <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} onLanding={onLanding} />
     </>
   )
 }

@@ -2,11 +2,10 @@ import { useRef } from 'react'
 import { gsap, ScrollTrigger, useGSAP } from '../../lib/gsap'
 import { prefersReducedMotion } from '../../lib/useReducedMotion'
 import { addItem } from '../../lib/cart'
-import { scrollToScene, scrollToY } from '../../lib/lenis'
-import { cta, footer, nav } from '../../content/copy'
+import { cta } from '../../content/copy'
 import { MagneticButton } from '../../components/MagneticButton'
-import { Newsletter } from '../../components/Newsletter'
-import { SoundToggle } from '../../components/SoundToggle'
+import { Footer } from '../../components/Footer'
+import { Link } from '../../components/Link'
 import { FINISHES } from '../Materials/constants'
 import { getFinish } from '../Materials/live'
 
@@ -67,36 +66,14 @@ export function Cta() {
             <span className="font-normal text-ash">{cta.secondaryPrice}</span>
           </MagneticButton>
         </div>
+        <p data-rise className="label mt-8 flex flex-wrap gap-x-8 gap-y-2">
+          <Link to="/one" className="transition-colors hover:text-brass">Discover One →</Link>
+          <Link to="/buds" className="transition-colors hover:text-brass">Discover Buds →</Link>
+          <Link to="/compare" className="transition-colors hover:text-brass">Compare →</Link>
+        </p>
       </div>
 
-      <footer className="mt-28 grid gap-12 border-t hairline pb-8 pt-12 md:grid-cols-12">
-        <div data-rise className="md:col-span-6">
-          <Newsletter />
-        </div>
-        <nav data-rise aria-label="Footer" className="md:col-span-3 md:col-start-8">
-          <p className="label label-bone mb-4">Explore</p>
-          <ul className="space-y-2.5">
-            {nav.links.map((l) => (
-              <li key={l.scene}>
-                <button type="button" onClick={() => scrollToScene(l.scene)} className="text-ash transition-colors hover:text-bone">
-                  {l.label}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div data-rise className="flex flex-col items-start gap-3 md:col-span-2 md:items-end">
-          <SoundToggle />
-          <button type="button" onClick={() => scrollToY(0)} className="label transition-colors hover:text-bone">
-            {footer.top} ↑
-          </button>
-        </div>
-
-        <div data-rise className="flex flex-col gap-3 border-t hairline pt-6 md:col-span-12 md:flex-row md:items-center md:justify-between">
-          <p className="font-display text-2xl tracking-tight">{footer.line}</p>
-          <p className="label text-fog">{footer.fine}</p>
-        </div>
-      </footer>
+      <Footer rise />
     </section>
   )
 }

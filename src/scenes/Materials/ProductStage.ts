@@ -37,9 +37,9 @@ export class ProductStage {
   private tmp = new THREE.Vector3()
   private disposables: { dispose(): void }[] = []
 
-  constructor(tier: Tier, renderer: THREE.WebGLRenderer, aspect: number) {
+  constructor(tier: Tier, renderer: THREE.WebGLRenderer, aspect: number, model: HeadphoneModel = buildHeadphones()) {
     this.aspect = aspect
-    this.model = buildHeadphones()
+    this.model = model
     this.scene.add(this.model.root)
     this.scene.environment = getEnvironment(renderer)
     this.scene.environmentIntensity = 1.9
@@ -87,9 +87,8 @@ export class ProductStage {
   }
 
   /** Apply a scene state: transform, explode, finish colours. */
-  update(dt: number, st: ProductState, snap = false) {
+  update(dt: number, st: ProductState, snap = false, anchor = productAnchor(this.aspect)) {
     this.vis = st.vis
-    const anchor = productAnchor(this.aspect)
     const root = this.model.root
     root.position.set(anchor.x + st.x, anchor.y + st.y, 0)
     // Exploded, the model is 4+ units wide — shrink it to keep the whole thing on screen.

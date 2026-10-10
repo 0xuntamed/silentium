@@ -14,6 +14,7 @@ import { ancLive, updateAncLive } from '../scenes/ANC/live'
 import { setAncStills } from '../scenes/ANC/stills'
 import { productLive, setFinishIndex, setProductStills, updateProductLive } from '../scenes/Materials/live'
 import { spatialLive, updateSpatialLive } from '../scenes/Spatial/live'
+import { subscribeView, viewLive } from '../scenes/Product/viewLive'
 import { ShakeAndGrain } from '../systems/grain/ShakeAndGrain'
 import { Passes } from './Passes'
 
@@ -90,6 +91,17 @@ function Rig({ tier }: { tier: Tier }) {
           advance(performance.now())
           return snap()
         },
+      },
+      view: {
+        /** Deterministic frame of the product page model at a given angle/explode (dev/test only). */
+        snapshot: (rotY: number, rotX = 0.12, explode = 0, finish = 0) => {
+          ancLive.frozen = true
+          Object.assign(viewLive, { targetY: rotY, targetX: rotX, explodeTarget: explode, finish, still: true })
+          passes.tickView(1, performance.now(), true)
+          advance(performance.now())
+          return snap()
+        },
+        state: () => ({ ...viewLive }),
       },
       spatial: {
         setP: (p: number | null) => {
@@ -172,7 +184,16 @@ function Rig({ tier }: { tier: Tier }) {
       sim.rot.set(keep.rot)
       engine.prewarm(0)
       advance(performance.now())
-      return
+
+      // Product pages under reduced motion: no loop, but the controls still work, so redraw on demand.
+      const redraw = () => {
+        if (!viewLive.active && viewLive.vis < 0.002) return
+        viewLive.still = true
+        passes.tickView(1 / 60, performance.now(), true)
+        advance(performance.now())
+      }
+      redraw()
+      return subscribeView(redraw)
     }
     const tick = (time: number, deltaMs: number) => {
       if (document.hidden || ancLive.frozen) return

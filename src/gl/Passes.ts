@@ -10,6 +10,8 @@ import { ancLive, updateAncLive } from '../scenes/ANC/live'
 import { ProductStage } from '../scenes/Materials/ProductStage'
 import { getFinish, productLive, updateProductLive } from '../scenes/Materials/live'
 import { partProgress } from '../scenes/Materials/productState'
+import { buildBuds } from '../scenes/Product/budsModel'
+import { updateView, viewLive } from '../scenes/Product/viewLive'
 import { SpatialPass } from '../scenes/Spatial/SpatialPass'
 import { spatialLive, updateSpatialLive } from '../scenes/Spatial/live'
 
@@ -27,6 +29,8 @@ export class Passes {
   anc: AncStage | null = null
   product: ProductStage | null = null
   spatial: SpatialPass | null = null
+  /** The Buds model for their product page (One reuses `product`). */
+  buds: ProductStage | null = null
   aspect: number
 
   constructor(
@@ -54,6 +58,35 @@ export class Passes {
     return this.product
   }
 
+  ensureBuds() {
+    if (!this.buds) {
+      this.buds = new ProductStage(this.tier, this.gl, this.aspect, buildBuds())
+      void this.gl.compileAsync?.(this.buds.scene, this.camera)
+    }
+    return this.buds
+  }
+
+  /** The stage that draws the product-page model right now. */
+  viewStage() {
+    return viewLive.kind === 'buds' ? this.ensureBuds() : this.ensureProduct()
+  }
+
+  /** Product-page layout: model on the right of the copy on wide screens, above it on phones. */
+  private viewAnchor() {
+    return window.innerWidth >= 1024 && this.aspect > 1 ? { x: this.aspect * 0.4, y: 0.12, k: 1 } : { x: 0, y: 0.28, k: Math.min(1, this.aspect / 0.9) * 0.82 }
+  }
+
+  /** Advance the 360° view and push it into its pass (also used for on-demand renders under reduced motion). */
+  tickView(dt: number, now: number, snap = false) {
+    if (!viewLive.active && viewLive.vis < 0.002) return
+    viewLive.scrollY = scrollSignal.y
+    viewLive.vh = window.innerHeight
+    updateView(dt, now, snap)
+    const stage = this.viewStage()
+    stage.setFinish(viewLive.finish)
+    stage.update(dt, viewLive.state, snap, this.viewAnchor())
+  }
+
   ensureSpatial() {
     if (!this.spatial) this.spatial = new SpatialPass(this.aspect)
     return this.spatial
@@ -63,6 +96,7 @@ export class Passes {
     this.aspect = aspect
     this.anc?.resize(this.gl, aspect)
     this.product?.resize(this.gl, aspect)
+    this.buds?.resize(this.gl, aspect)
     this.spatial?.resize(aspect)
   }
 
@@ -93,7 +127,9 @@ export class Passes {
 
     if (this.anc && ancLive.active) this.anc.update(Math.min(dt, 0.05), ancLive.state, ancLive.vis, time)
     if (this.spatial && spatialLive.active) this.spatial.update(time)
-    if (this.product) {
+    const onPage = viewLive.active || viewLive.vis > 0.002
+    if (onPage) this.tickView(dt, performance.now())
+    if (this.product && !(onPage && viewLive.kind === 'one')) {
       this.product.setFinish(getFinish())
       this.product.update(dt, productLive.state)
       if (productLive.state.vis > 0.003) this.projectLabels()
@@ -122,13 +158,17 @@ export class Passes {
   render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
     if (this.anc && ancLive.active) this.anc.render(renderer, camera)
     if (this.spatial && spatialLive.active) this.spatial.render(renderer, camera)
-    if (this.product && productLive.state.vis > 0.003) this.product.render(renderer, camera)
+    const onPage = viewLive.active || viewLive.vis > 0.002
+    if (onPage) {
+      if (viewLive.state.vis > 0.003) this.viewStage().render(renderer, camera)
+    } else if (this.product && productLive.state.vis > 0.003) this.product.render(renderer, camera)
   }
 
   dispose() {
     this.anc?.dispose()
     this.product?.dispose()
     this.spatial?.dispose()
-    this.anc = this.product = this.spatial = null
+    this.buds?.dispose()
+    this.anc = this.product = this.spatial = this.buds = null
   }
 }
