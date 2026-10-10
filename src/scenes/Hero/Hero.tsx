@@ -24,7 +24,7 @@ export function Hero() {
     () => {
       if (prefersReducedMotion() || !root.current) return
       const chars = root.current.querySelectorAll('[data-char]')
-      const split = new SplitText('[data-tagline]', { type: 'lines', mask: 'lines' })
+      const split = new SplitText('[data-tagline]', { type: 'lines', mask: 'lines', aria: 'none' })
       gsap.set(chars, { yPercent: 108 })
       gsap.set(split.lines, { yPercent: 105 })
       gsap.set('[data-fade-in]', { opacity: 0 })

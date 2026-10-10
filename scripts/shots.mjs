@@ -114,7 +114,7 @@ try {
       const input = page.getByLabel('Email address')
       await input.fill('nope')
       await page.getByRole('button', { name: 'Subscribe' }).click()
-      await page.waitForTimeout(500)
+      await page.waitForTimeout(1500)
       ;(await page.getByText('does not look like an email').count()) ? ok('invalid email rejected') : fail('no error for invalid email')
       await input.fill('me@example.com')
       await page.getByRole('button', { name: 'Subscribe' }).click()

@@ -256,10 +256,10 @@ function FinishPicker() {
       <p id="finish-label" className="label mb-3">
         {productUi.finish}: <span className="label-bone">{FINISHES[finish].label}</span>
       </p>
-      <ul className="flex flex-wrap gap-3" role="radiogroup" aria-labelledby="finish-label">
+      <div className="flex flex-wrap gap-3" role="radiogroup" aria-labelledby="finish-label">
         {FINISHES.map((f, i) => (
-          <li key={f.id}>
-            <button
+          <button
+              key={f.id}
               type="button"
               role="radio"
               aria-checked={finish === i}
@@ -271,9 +271,8 @@ function FinishPicker() {
               <span aria-hidden className="block h-2.5 w-2.5 rounded-full ring-1 ring-bone/20" style={{ background: f.swatch }} />
               {f.label}
             </button>
-          </li>
         ))}
-      </ul>
+      </div>
     </div>
   )
 }

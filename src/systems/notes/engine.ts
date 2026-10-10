@@ -63,6 +63,11 @@ class NotesEngine {
   }
 
   /** Run the sim N steps with no input (used to give the reduced-motion still a settled field). */
+  /** How far the notes step back: behind 3D content, and on the reading pages (product, compare). */
+  dim() {
+    return Math.max(getRouter().path === '/' ? 0 : 1, productLive.state.vis, viewLive.state.vis * 0.8, spatialLive.active ? spatialLive.vis * 0.7 : 0)
+  }
+
   prewarm(steps: number) {
     const sim = this.sim!
     const inp = this.inputs
@@ -73,6 +78,7 @@ class NotesEngine {
     }
     this.t = steps / 60
     inp.t = this.t
+    inp.dim = this.dim()
     sim.write(inp, 0)
     this.listeners.forEach((cb) => cb(sim))
   }
@@ -104,7 +110,7 @@ class NotesEngine {
     inp.cursor.speed = cursorSignal.speed * (2 / H)
 
     // Reading pages (product, compare): keep the notes, but quieter than the copy.
-    inp.dim = Math.max(getRouter().path === '/' ? 0 : 1, productLive.state.vis, viewLive.state.vis * 0.8, spatialLive.active ? spatialLive.vis * 0.7 : 0)
+    inp.dim = this.dim()
     const lay = ancLayout(sim.aspect)
     const a = inp.anc!
     a.gather = ancLive.state.gather * ancLive.vis

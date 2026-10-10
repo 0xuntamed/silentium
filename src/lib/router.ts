@@ -78,6 +78,10 @@ if (typeof window !== 'undefined') {
 }
 
 export const getRouter = () => state
+export const subscribeRouter = (cb: () => void) => {
+  listeners.add(cb)
+  return () => listeners.delete(cb)
+}
 export function useRouter() {
   return useSyncExternalStore(
     (l) => {

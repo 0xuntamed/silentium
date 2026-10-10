@@ -108,7 +108,7 @@ export default function App() {
     <MotionConfig reducedMotion="user">
     <LazyMotion features={domAnimation} strict>
       <a
-        href="#hero"
+        href="#top"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:bg-bone focus:px-4 focus:py-2 focus:text-basalt"
       >
         Skip to content
@@ -121,7 +121,7 @@ export default function App() {
       {gate && route === '/' && <Silence onDone={() => setGate(false)} />}
       <Nav />
       <CartDrawer />
-      <main id="top" inert={(gate && route === '/') || cartOpen} className="relative z-[1]">
+      <main id="top" tabIndex={-1} inert={(gate && route === '/') || cartOpen} className="relative z-[1] outline-none">
         {route === '/' && <Landing />}
         <Suspense fallback={null}>
           {route === '/one' && <ProductPage key="one" id="one" />}

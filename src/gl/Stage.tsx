@@ -14,6 +14,7 @@ import { ancLive, updateAncLive } from '../scenes/ANC/live'
 import { setAncStills } from '../scenes/ANC/stills'
 import { productLive, setFinishIndex, setProductStills, updateProductLive } from '../scenes/Materials/live'
 import { spatialLive, updateSpatialLive } from '../scenes/Spatial/live'
+import { subscribeRouter } from '../lib/router'
 import { subscribeView, viewLive } from '../scenes/Product/viewLive'
 import { ShakeAndGrain } from '../systems/grain/ShakeAndGrain'
 import { Passes } from './Passes'
@@ -193,7 +194,20 @@ function Rig({ tier }: { tier: Tier }) {
         advance(performance.now())
       }
       redraw()
-      return subscribeView(redraw)
+      // The notes dim on the reading pages: restamp the still field when the route changes.
+      const onRoute = () => {
+        engine.prewarm(0)
+        advance(performance.now())
+      }
+      const offView = subscribeView(() => {
+        engine.prewarm(0)
+        redraw()
+      })
+      const offRoute = subscribeRouter(onRoute)
+      return () => {
+        offView()
+        offRoute()
+      }
     }
     const tick = (time: number, deltaMs: number) => {
       if (document.hidden || ancLive.frozen) return

@@ -6,7 +6,7 @@
   --color-basalt: #0b0b0c;
   --color-graphite: #141416;
   --color-slate: #1e1e21;
-  --color-fog: #6f6c66;
+  --color-fog: #8a867e; /* AA (≥ 4.5:1) on basalt, graphite and slate */
   --color-ash: #a8a39a;
   --color-bone: #efe9dd;
   --color-brass: #c6a15b;

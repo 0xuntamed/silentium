@@ -126,9 +126,9 @@ export function Materials() {
         <p data-note className="label hidden sm:block motion-reduce:hidden">
           {materials.finishNote}
         </p>
-        <ul className="flex gap-3" role="radiogroup" aria-label="Finish">
+        <div className="flex gap-3" role="radiogroup" aria-label="Finish">
           {FINISHES.map((f, i) => (
-            <li key={f.id} data-finish>
+            <div key={f.id} data-finish>
               <button
                 type="button"
                 role="radio"
@@ -141,9 +141,9 @@ export function Materials() {
                 <span aria-hidden className="block h-2.5 w-2.5 rounded-full" style={{ background: f.swatch }} />
                 {f.label}
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       </div>
     </Scene>
   )
